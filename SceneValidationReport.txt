@@ -1,0 +1,12 @@
+=== NEON COAST RACING: COMPREHENSIVE PROJECT VALIDATION ===
+Timestamp: 2026-09-18 23:50:00
+
+[SCENE] Active Scene: MainMenu (Assets/Scenes/MainMenu.unity)
+[CAMERA] HDR: True | PostProcessing: False | SMAA AntiAliasing: False
+[POST-PROCESS] MotionBlur Disabled (no smear): True | Bloom Calibrated: True | Contrast/Exposure Calibrated: True
+[HUD] WARNING: RacingHUD not in active scene (ignore if on MainMenu).
+[GAMEPLAY SYSTEMS] PauseMenu: False | RaceResults: False | RaceAudio: False
+[VEHICLES] Registered: 3 cars, 4 paints | Active: ASTER GT in Ion Cyan
+[ATMOSPHERE] Fog: False | Density: 0,01 | SkyColor: RGBA(0.000, 0.000, 0.000, 1.000)
+
+>>> OVERALL STATUS: SOME CHECKS NEED ATTENTION <<<

@@ -1,0 +1,7 @@
+Grounded: True
+Acceleration after 3s (km/h): 30,26074
+After braking (km/h): 20,68978
+Reverse (m/s): -4,808556
+Steering yaw change: 15,172
+Barrier held: True
+PASS=True
