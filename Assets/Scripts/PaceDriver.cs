@@ -35,6 +35,22 @@ public class PaceDriver : MonoBehaviour {
 
     void Start() {
         RefreshVehicleList();
+        // Para carros de corrida (não tráfego urbano), eleva a velocidade competitiva
+        // alinhando com a potência real e personalidade dos pilotos rivais
+        if (!traffic && car != null) {
+            var racer = GetComponent<GridRacer>();
+            string rName = racer ? racer.driverName : "";
+            if (rName.Contains("KAI")) {
+                aggression = 0.94f;
+                cruiseSpeed = Mathf.Max(cruiseSpeed, car.topSpeed * 0.95f);
+            } else if (rName.Contains("NOVA")) {
+                aggression = 0.86f;
+                cruiseSpeed = Mathf.Max(cruiseSpeed, car.topSpeed * 0.92f);
+            } else {
+                aggression = 0.78f;
+                cruiseSpeed = Mathf.Max(cruiseSpeed, car.topSpeed * 0.88f);
+            }
+        }
     }
 
     /// <summary>

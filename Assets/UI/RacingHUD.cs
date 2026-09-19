@@ -138,6 +138,14 @@ public class RacingHUD : MonoBehaviour {
    }
   }
 
+  // Vácuo aerodinâmico (Slipstream / Drafting)
+  if (car.Slipstreaming && !GameMode.TimeTrial) {
+   alertBanner.SetActive(true);
+   alertBannerText.text = "VÁCUO ATIVO  //  +15 KM/H";
+   alertBannerText.color = new Color(0.2f, 0.95f, 1f);
+   return;
+  }
+
   // Anúncio de última volta
   if (race.Lap == race.totalLaps && lastLapAnnounced < race.totalLaps) {
    lastLapAnnounced = race.totalLaps;

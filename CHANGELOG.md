@@ -7,6 +7,18 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [0.2.1] - 2026-09-19
+
+### Corrigido
+- **Eliminação do Clarão Branco nas Lanternas Traseiras**:
+  - Removido multiplicador excessivo de intensidade HDR que causava sobreexposição (*white burnout*) no Tonemapping ACES e Bloom da câmera.
+  - Calibração do material `SupercarTailLED` para vermelho rubi puro (`Color(0.88, 0.02, 0.04)`) preservando a nitidez sem emitir clarão branco.
+  - Atualização dos estados dinâmicos de freio (`tailNormal` e `tailBraking`) com intensidades calibradas.
+  - Purga completa de cubos primitivos residuais e luzes espúrias em todos os veículos da cena (jogador, rivais e tráfego civil).
+  - Adicionado `ApplyTrafficSpecs` no `ArcadeCar.cs` para garantir que o tráfego civil também utilize materiais limpos sem clarão.
+
+---
+
 ## [0.2.0] - 2026-09-19
 
 ### Adicionado

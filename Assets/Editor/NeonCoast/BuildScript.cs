@@ -21,9 +21,26 @@ public static class NCRBuildScript {
    HUDOverhaul.RebuildHUD();
    GameUIBuilder.Build();
 
+   // Remove luzes espúrias que causavam clarão/ofuscamento da câmera
+   var allLights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+   foreach (var l in allLights) {
+    if (l != null && (l.name == "Paint rim light" || l.name == "Projector headlight" || l.name.Contains("Rim light") || l.name.Contains("Flare"))) {
+     Debug.Log("[NCRBuildScript] Removing rogue light: " + l.name);
+     Object.DestroyImmediate(l.gameObject);
+    }
+   }
+   var allTransforms = Object.FindObjectsByType<Transform>(FindObjectsSortMode.None);
+   foreach (var t in allTransforms) {
+    if (t != null && (t.name == "Paint rim light" || t.name == "Projector headlight")) {
+     Debug.Log("[NCRBuildScript] Destroying rogue scene object: " + t.name);
+     Object.DestroyImmediate(t.gameObject);
+    }
+   }
+
    // Atualiza os visuais 3D do carro na cena NeonCoast
    var allCars = Object.FindObjectsByType<NeonCoast.ArcadeCar>(FindObjectsSortMode.None);
    foreach (var car in allCars) {
+    car.CleanExcessiveLights();
     if (!car.automation) {
      var v = NeonCoast.VehicleRegistry.GetSelectedVehicle();
      var p = NeonCoast.VehicleRegistry.GetSelectedPaint();

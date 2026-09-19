@@ -77,16 +77,16 @@ public static class CarVisualsOverhaul {
         tailHousingMat.SetFloat("_Cull", 0f);
         tailHousingMat.enableInstancing = true;
 
-        // Elementos LED das lanternas traseiras (vermelho rubi autêntico, autoiluminado e nítido)
+        // Elementos LED das lanternas traseiras (vermelho rubi puro, nítido e sem clarão branco)
         var unlitShader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? litShader;
         var ledRedMat = new Material(unlitShader);
         ledRedMat.name = "SupercarTailLED";
-        Color baseTailRed = new Color(0.96f, 0.04f, 0.08f);
-        ledRedMat.SetColor("_BaseColor", baseTailRed * 1.6f);
-        ledRedMat.SetColor("_Color", baseTailRed * 1.6f);
+        Color baseTailRed = new Color(0.88f, 0.02f, 0.04f);
+        ledRedMat.SetColor("_BaseColor", baseTailRed);
+        ledRedMat.SetColor("_Color", baseTailRed);
         if (ledRedMat.HasProperty("_EmissionColor")) {
             ledRedMat.EnableKeyword("_EMISSION");
-            ledRedMat.SetColor("_EmissionColor", baseTailRed * 1.8f);
+            ledRedMat.SetColor("_EmissionColor", baseTailRed * 0.85f);
         }
         ledRedMat.SetFloat("_Cull", 0f);
         ledRedMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;

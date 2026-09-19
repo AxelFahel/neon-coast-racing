@@ -28,8 +28,8 @@ public class ArcadeCar : MonoBehaviour {
  Vector3 spawn; Quaternion spawnRotation;
  readonly System.Collections.Generic.List<Material> tailLightMats = new System.Collections.Generic.List<Material>();
  Material playerPaint;
- Color tailNormal  = new Color(0.96f, 0.04f, 0.08f) * 1.5f;
- Color tailBraking = new Color(1.00f, 0.06f, 0.08f) * 3.5f;
+ Color tailNormal  = new Color(0.85f, 0.02f, 0.04f);
+ Color tailBraking = new Color(1.00f, 0.04f, 0.06f);
 
  // ── Physics constants ─────────────────────────────────────────────────────
  const float RbMass           = 1350f;
@@ -61,6 +61,7 @@ public class ArcadeCar : MonoBehaviour {
   CleanExcessiveLights();
   if (!automation) ApplyVehicleSpecs();
   else if (GetComponent<GridRacer>() != null) ApplyRivalSpecs();
+  else ApplyTrafficSpecs();
  }
 
  void ApplyVehicleSpecs() {
@@ -178,6 +179,34 @@ public class ArcadeCar : MonoBehaviour {
   }
  }
 
+ void ApplyTrafficSpecs() {
+  CleanExcessiveLights();
+  tailLightMats.Clear();
+
+  // Substitui os cubos antigos de lanterna por material LED vermelho escuro/saturado sem clarão branco
+  var litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+  var trafficTailMat = new Material(litShader);
+  trafficTailMat.name = "TrafficTailLED";
+  Color red = new Color(0.85f, 0.02f, 0.04f);
+  trafficTailMat.SetColor("_BaseColor", red);
+  if (trafficTailMat.HasProperty("_EmissionColor")) {
+   trafficTailMat.EnableKeyword("_EMISSION");
+   trafficTailMat.SetColor("_EmissionColor", red * 0.85f);
+  }
+  foreach (var mr in GetComponentsInChildren<MeshRenderer>(true)) {
+   if (mr.name.Contains("Tail") || mr.name.Contains("tail")) {
+    mr.material = trafficTailMat;
+    tailLightMats.Add(trafficTailMat);
+   }
+  }
+
+  // Faróis dianteiros focados para o tráfego civil
+  if (transform.Find("Car_Headlight_L") == null) {
+   CreateHeadlight("Car_Headlight_L", new Vector3(-0.6f, 0.65f, 2.0f));
+   CreateHeadlight("Car_Headlight_R", new Vector3( 0.6f, 0.65f, 2.0f));
+  }
+ }
+
  public void CleanExcessiveLights() {
   // Destrói qualquer luz da cena antiga ou rogue que cause clarão branco ofuscante
   var lights = GetComponentsInChildren<Light>(true);
@@ -192,11 +221,26 @@ public class ArcadeCar : MonoBehaviour {
    if (g != null && g != gameObject) Destroy(g);
   }
 
-  // Purga GameObjects residuais específicos
-  foreach (var n in new string[] { "Paint rim light", "Projector headlight", "Car_TailLight_L", "Car_TailLight_R", "Car_RoofFill" }) {
-   var t = transform.Find(n);
-   if (t) Destroy(t.gameObject);
+  // Purga GameObjects residuais em TODA a hierarquia do carro
+  var oldNames = new System.Collections.Generic.HashSet<string> {
+   "Paint rim light", "Projector headlight", "Car_TailLight_L", "Car_TailLight_R",
+   "Car_RoofFill"
+  };
+  foreach (var t in GetComponentsInChildren<Transform>(true)) {
+   if (t && t != transform && oldNames.Contains(t.name)) {
+    Destroy(t.gameObject);
+   }
   }
+
+  // Remove cubos antigos "Tail light" e "Headlight" se o novo modelo estilizado estiver ativo
+  if (transform.Find("Aster GT Coachwork/Tail light bar") != null || GetComponent<GridRacer>() != null || !automation) {
+   foreach (var t in GetComponentsInChildren<Transform>(true)) {
+    if (t && t != transform && (t.name == "Tail light" || t.name == "Headlight")) {
+     Destroy(t.gameObject);
+    }
+   }
+  }
+
   var fL = transform.Find("Car_Headlight_L/Car_Headlight_L_Flare");
   if (fL) Destroy(fL.gameObject);
   var fR = transform.Find("Car_Headlight_R/Car_Headlight_R_Flare");
@@ -251,7 +295,30 @@ public class ArcadeCar : MonoBehaviour {
    bool isBraking = (throttle * ForwardSpeed < -1.2f) || handbrake;
    Color targetCol = isBraking ? tailBraking : tailNormal;
    foreach (var mat in tailLightMats) {
-    if (mat) mat.SetColor("_EmissionColor", Color.Lerp(mat.GetColor("_EmissionColor"), targetCol, Time.deltaTime * 16f));
+    if (!mat) continue;
+    if (mat.HasProperty("_BaseColor")) {
+     mat.SetColor("_BaseColor", Color.Lerp(mat.GetColor("_BaseColor"), targetCol, Time.deltaTime * 16f));
+    }
+    if (mat.HasProperty("_Color")) {
+     mat.SetColor("_Color", Color.Lerp(mat.GetColor("_Color"), targetCol, Time.deltaTime * 16f));
+    }
+    if (mat.HasProperty("_EmissionColor")) {
+     mat.SetColor("_EmissionColor", Color.Lerp(mat.GetColor("_EmissionColor"), targetCol * 0.85f, Time.deltaTime * 16f));
+    }
+   }
+  }
+
+  // Vácuo aerodinâmico (Slipstream / Drafting) atrás de outros carros
+  Slipstreaming = false;
+  if (ForwardSpeed > 18f) {
+   var allCars = FindObjectsByType<ArcadeCar>(FindObjectsSortMode.None);
+   foreach (var c in allCars) {
+    if (!c || c == this) continue;
+    Vector3 localOther = transform.InverseTransformPoint(c.transform.position);
+    if (localOther.z > 3.5f && localOther.z < 22f && Mathf.Abs(localOther.x) < 2.3f && Mathf.Abs(localOther.y) < 2.0f) {
+     Slipstreaming = true;
+     break;
+    }
    }
   }
  }
@@ -278,9 +345,9 @@ public class ArcadeCar : MonoBehaviour {
   Nitro = Mathf.Clamp01(Nitro + Time.fixedDeltaTime * nitroDelta);
 
   bool  braking  = throttle * speed < -1.5f;
-  float speedCap = throttle < 0 ? 10f : topSpeed * (Boosting ? 1.25f : 1f);
+  float speedCap = throttle < 0 ? 10f : topSpeed * (Boosting ? 1.25f : Slipstreaming ? 1.10f : 1f);
   float torque   = braking ? 0f
-                   : throttle * (Boosting ? MotorTorqueBoost : MotorTorqueBase)
+                   : throttle * (Boosting ? MotorTorqueBoost : Slipstreaming ? MotorTorqueBase * 1.25f : MotorTorqueBase)
                      * torqueMult * Mathf.Clamp01(1f - Mathf.Abs(speed) / speedCap);
 
   for (int i = 0; i < wheels.Length; i++) {
