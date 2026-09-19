@@ -107,7 +107,7 @@ public class ArcadeCar : MonoBehaviour {
    var underLight = underglowGO.AddComponent<Light>();
    underLight.type = LightType.Point;
    underLight.range = 3.2f;
-   underLight.intensity = 1.0f;
+   underLight.intensity = 0.5f;
    underLight.color = p.color;
    underLight.shadows = LightShadows.None;
   }
@@ -173,7 +173,7 @@ public class ArcadeCar : MonoBehaviour {
    var underLight = underglowGO.AddComponent<Light>();
    underLight.type = LightType.Point;
    underLight.range = 3.0f;
-   underLight.intensity = 1.0f;
+   underLight.intensity = 0.5f;
    underLight.color = rivalColor;
    underLight.shadows = LightShadows.None;
   }
@@ -213,7 +213,9 @@ public class ArcadeCar : MonoBehaviour {
   var toDestroy = new System.Collections.Generic.List<GameObject>();
   foreach (var l in lights) {
    if (!l) continue;
-   if (l.name != "Car_Headlight_L" && l.name != "Car_Headlight_R" && l.name != "Car_Underglow") {
+   // Preserva apenas as luzes oficiais do carro
+   if (l.name != "Car_Headlight_L" && l.name != "Car_Headlight_R"
+       && l.name != "Car_Underglow" && l.name != "Car_TailGlow") {
     toDestroy.Add(l.gameObject);
    }
   }
@@ -221,15 +223,10 @@ public class ArcadeCar : MonoBehaviour {
    if (g != null && g != gameObject) Destroy(g);
   }
 
-  // Purga GameObjects residuais em TODA a hierarquia do carro
-  var oldNames = new System.Collections.Generic.HashSet<string> {
-   "Paint rim light", "Projector headlight", "Car_TailLight_L", "Car_TailLight_R",
-   "Car_RoofFill"
-  };
-  foreach (var t in GetComponentsInChildren<Transform>(true)) {
-   if (t && t != transform && oldNames.Contains(t.name)) {
-    Destroy(t.gameObject);
-   }
+  // Purga GameObjects residuais específicos
+  foreach (var n in new string[] { "Paint rim light", "Projector headlight", "Car_TailLight_L", "Car_TailLight_R", "Car_RoofFill" }) {
+   var t = transform.Find(n);
+   if (t) Destroy(t.gameObject);
   }
 
   // Remove cubos antigos "Tail light" e "Headlight" se o novo modelo estilizado estiver ativo
@@ -254,14 +251,14 @@ public class ArcadeCar : MonoBehaviour {
   var hlGO = new GameObject(name);
   hlGO.transform.SetParent(transform, false);
   hlGO.transform.localPosition = localPos;
-  hlGO.transform.localRotation = Quaternion.Euler(3.5f, (localPos.x > 0 ? 2.0f : -2.0f), 0f);
+  hlGO.transform.localRotation = Quaternion.Euler(2.5f, (localPos.x > 0 ? 1.5f : -1.5f), 0f);
   var l = hlGO.AddComponent<Light>();
   l.type = LightType.Spot;
-  l.range = 72f;
-  l.spotAngle = 55f;
-  l.innerSpotAngle = 28f;
-  l.intensity = 4.2f; // Farol focado e realista, sem criar clarão cegante
-  l.color = new Color(0.92f, 0.97f, 1f);
+  l.range = 55f;
+  l.spotAngle = 42f;        // Cone mais fechado = feixe mais definido na pista
+  l.innerSpotAngle = 18f;
+  l.intensity = 3.5f;       // Iluminação real na pista sem bloom excessivo
+  l.color = new Color(0.90f, 0.95f, 1.0f);  // Branco levemente frio (xenônio/LED)
   l.shadows = LightShadows.None;
  }
 
@@ -290,23 +287,34 @@ public class ArcadeCar : MonoBehaviour {
     Quaternion.Euler(throttle * -1.1f, 0, -smoothedSteer * Mathf.Clamp(SpeedKmh / 45f, 0, 2)),
     Time.deltaTime * BodyTiltSpeed);
 
-  // Dynamic brake lights — modula a emissão das lanternas sem ofuscar a tela
-  if (tailLightMats.Count > 0) {
-   bool isBraking = (throttle * ForwardSpeed < -1.2f) || handbrake;
-   Color targetCol = isBraking ? tailBraking : tailNormal;
-   foreach (var mat in tailLightMats) {
-    if (!mat) continue;
-    if (mat.HasProperty("_BaseColor")) {
-     mat.SetColor("_BaseColor", Color.Lerp(mat.GetColor("_BaseColor"), targetCol, Time.deltaTime * 16f));
+   // Dynamic brake lights — modula LEDs e luz de glow no asfalto
+   {
+    bool isBraking = (throttle * ForwardSpeed < -1.2f) || handbrake;
+    // Cores em HDR: normal = 2.8 (glow vermelho suave), freio = 6.0 (LED vivo)
+    Color normalHDR  = new Color(2.8f, 0.04f, 0.06f);
+    Color brakingHDR = new Color(6.0f, 0.05f, 0.08f);
+    Color targetCol  = isBraking ? brakingHDR : normalHDR;
+
+    foreach (var mat in tailLightMats) {
+     if (!mat) continue;
+     if (mat.HasProperty("_BaseColor")) {
+      mat.SetColor("_BaseColor", Color.Lerp(mat.GetColor("_BaseColor"), targetCol, Time.deltaTime * 14f));
+     }
+     if (mat.HasProperty("_Color")) {
+      mat.SetColor("_Color", Color.Lerp(mat.GetColor("_Color"), targetCol, Time.deltaTime * 14f));
+     }
+     if (mat.HasProperty("_EmissionColor")) {
+      mat.SetColor("_EmissionColor", Color.Lerp(mat.GetColor("_EmissionColor"), targetCol, Time.deltaTime * 14f));
+     }
     }
-    if (mat.HasProperty("_Color")) {
-     mat.SetColor("_Color", Color.Lerp(mat.GetColor("_Color"), targetCol, Time.deltaTime * 16f));
-    }
-    if (mat.HasProperty("_EmissionColor")) {
-     mat.SetColor("_EmissionColor", Color.Lerp(mat.GetColor("_EmissionColor"), targetCol * 0.85f, Time.deltaTime * 16f));
+
+    // Modula a intensidade da luz pontual de glow traseiro
+    var tailGlowT = bodyVisual ? bodyVisual.Find("Car_TailGlow") : transform.Find("Car_TailGlow");
+    if (tailGlowT) {
+     var tgl = tailGlowT.GetComponent<Light>();
+     if (tgl) tgl.intensity = Mathf.Lerp(tgl.intensity, isBraking ? 2.8f : 1.2f, Time.deltaTime * 14f);
     }
    }
-  }
 
   // Vácuo aerodinâmico (Slipstream / Drafting) atrás de outros carros
   Slipstreaming = false;

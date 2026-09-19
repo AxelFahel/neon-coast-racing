@@ -36,99 +36,104 @@ public static class CarVisualsOverhaul {
             Object.DestroyImmediate(g);
         }
 
-        // ── 1. MATERIAIS AUTOMOTIVOS PBR DE ALTA FIDELIDADE ─────────────────────
+        // ── 1. MATERIAIS AUTOMOTIVOS PBR REALISTAS ────────────────────────────
         var litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        var unlitShader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? litShader;
 
-        // Pintura automotiva perolizada metálica
+        // Pintura automotiva realista — camada base + clearcoat (verniz)
+        // Metálico 0.0 = pigmento puro (não é metal), smoothness alta = verniz polido
         var paintMat = new Material(litShader);
         paintMat.name = "SupercarPaint_" + paintData.name;
-        paintMat.SetColor("_BaseColor", paintData.color);
-        paintMat.SetFloat("_Metallic", 0.85f);
-        paintMat.SetFloat("_Smoothness", 0.94f);
-        paintMat.EnableKeyword("_EMISSION");
-        paintMat.SetColor("_EmissionColor", paintData.color * 0.16f); // Realce noturno suave
-        paintMat.SetFloat("_Cull", 0f); // Double-sided para acabamento impecável
+        // Escurece levemente a cor base para o verniz parecer mais profundo
+        Color paintBase = paintData.color * 0.82f;
+        paintBase.a = 1f;
+        paintMat.SetColor("_BaseColor", paintBase);
+        paintMat.SetFloat("_Metallic", 0.0f);       // Tinta não é metal — especular é do verniz
+        paintMat.SetFloat("_Smoothness", 0.92f);     // Verniz automotivo muito polido
+        // Sem emissão — pintura não emite luz, brilha pelo especular
+        paintMat.SetFloat("_Cull", 0f);
         paintMat.enableInstancing = true;
 
-        // Vidro automotivo escurecido fumê com alto índice de reflexão
+        // Vidro automotivo escurecido — levemente tintado e refletivo
         var glassMat = new Material(litShader);
         glassMat.name = "SupercarGlass";
-        glassMat.SetColor("_BaseColor", new Color(0.04f, 0.06f, 0.10f, 0.96f));
-        glassMat.SetFloat("_Metallic", 0.90f);
-        glassMat.SetFloat("_Smoothness", 0.98f);
+        glassMat.SetColor("_BaseColor", new Color(0.05f, 0.07f, 0.12f, 0.85f));
+        glassMat.SetFloat("_Metallic", 0.0f);
+        glassMat.SetFloat("_Smoothness", 0.97f);     // Vidro liso — reflete o ambiente
         glassMat.SetFloat("_Cull", 0f);
         glassMat.enableInstancing = true;
 
-        // Fibra de carbono para apêndices aerodinâmicos
+        // Fibra de carbono — surface rugosa com reflexo cruzado
         var carbonMat = new Material(litShader);
         carbonMat.name = "SupercarCarbon";
-        carbonMat.SetColor("_BaseColor", new Color(0.08f, 0.09f, 0.11f));
-        carbonMat.SetFloat("_Metallic", 0.45f);
-        carbonMat.SetFloat("_Smoothness", 0.82f);
+        carbonMat.SetColor("_BaseColor", new Color(0.06f, 0.07f, 0.08f));
+        carbonMat.SetFloat("_Metallic", 0.0f);
+        carbonMat.SetFloat("_Smoothness", 0.62f);
         carbonMat.SetFloat("_Cull", 0f);
         carbonMat.enableInstancing = true;
 
-        // Moldura e lentes escuras das lanternas traseiras (vidro fumê automotivo)
+        // Lente fumê da lanterna traseira (housing escuro com reflexo)
         var tailHousingMat = new Material(litShader);
         tailHousingMat.name = "SupercarTailHousing";
-        tailHousingMat.SetColor("_BaseColor", new Color(0.04f, 0.04f, 0.06f));
-        tailHousingMat.SetFloat("_Metallic", 0.60f);
-        tailHousingMat.SetFloat("_Smoothness", 0.95f);
+        tailHousingMat.SetColor("_BaseColor", new Color(0.03f, 0.03f, 0.04f));
+        tailHousingMat.SetFloat("_Metallic", 0.0f);
+        tailHousingMat.SetFloat("_Smoothness", 0.90f);
         tailHousingMat.SetFloat("_Cull", 0f);
         tailHousingMat.enableInstancing = true;
 
-        // Elementos LED das lanternas traseiras (vermelho rubi puro, nítido e sem clarão branco)
-        var unlitShader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? litShader;
-        var ledRedMat = new Material(unlitShader);
+        // LED traseiro: Lit shader com cor LDR vermelha + emissão HDR para bloom
+        // _BaseColor LDR → aparência visual vermelha nítida
+        // _EmissionColor HDR (>1) → bloom neon ativado corretamente pelo threshold
+        var ledRedMat = new Material(litShader);
         ledRedMat.name = "SupercarTailLED";
-        Color baseTailRed = new Color(0.88f, 0.02f, 0.04f);
-        ledRedMat.SetColor("_BaseColor", baseTailRed);
-        ledRedMat.SetColor("_Color", baseTailRed);
-        if (ledRedMat.HasProperty("_EmissionColor")) {
-            ledRedMat.EnableKeyword("_EMISSION");
-            ledRedMat.SetColor("_EmissionColor", baseTailRed * 0.85f);
-        }
+        ledRedMat.SetColor("_BaseColor", new Color(0.90f, 0.03f, 0.05f));
+        ledRedMat.SetFloat("_Metallic", 0.0f);
+        ledRedMat.SetFloat("_Smoothness", 0.88f);          // Lente LED polida
+        ledRedMat.EnableKeyword("_EMISSION");
+        // HDR: R=3.2 → bloom vermelho intenso sem branco
+        ledRedMat.SetColor("_EmissionColor", new Color(3.2f, 0.04f, 0.06f));
         ledRedMat.SetFloat("_Cull", 0f);
-        ledRedMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
+        ledRedMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
 
-        // Faróis dianteiros LED afiados (ciano-gelo / branco xenônio)
+        // Faróis: Lit com emissão HDR branco-frio (xenônio/LED)
         var ledCyanMat = new Material(litShader);
         ledCyanMat.name = "SupercarHeadLED";
-        ledCyanMat.SetColor("_BaseColor", new Color(0.78f, 0.95f, 1.0f));
+        ledCyanMat.SetColor("_BaseColor", new Color(0.88f, 0.94f, 1.0f));
+        ledCyanMat.SetFloat("_Metallic", 0.0f);
+        ledCyanMat.SetFloat("_Smoothness", 0.90f);
         ledCyanMat.EnableKeyword("_EMISSION");
-        ledCyanMat.SetColor("_EmissionColor", new Color(0.78f, 0.95f, 1.0f) * 4.8f);
-        ledCyanMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
+        ledCyanMat.SetColor("_EmissionColor", new Color(2.6f, 2.9f, 3.2f));   // HDR branco-frio
+        ledCyanMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
 
-        // Rodas: Liga de alumínio forjado polido
+        // Aro da roda: alumínio forjado escovado
         var wheelRimMat = new Material(litShader);
         wheelRimMat.name = "WheelAlloy";
-        wheelRimMat.SetColor("_BaseColor", new Color(0.72f, 0.75f, 0.80f));
-        wheelRimMat.SetFloat("_Metallic", 0.92f);
-        wheelRimMat.SetFloat("_Smoothness", 0.90f);
+        wheelRimMat.SetColor("_BaseColor", new Color(0.55f, 0.56f, 0.60f));
+        wheelRimMat.SetFloat("_Metallic", 0.95f);
+        wheelRimMat.SetFloat("_Smoothness", 0.72f);
         wheelRimMat.enableInstancing = true;
 
-        // Rodas: Borracha de alto desempenho
+        // Pneu: borracha vulcanizada preta mate
         var tireMat = new Material(litShader);
         tireMat.name = "TireRubber";
-        tireMat.SetColor("_BaseColor", new Color(0.04f, 0.04f, 0.05f));
-        tireMat.SetFloat("_Metallic", 0.05f);
-        tireMat.SetFloat("_Smoothness", 0.20f);
+        tireMat.SetColor("_BaseColor", new Color(0.055f, 0.055f, 0.06f));
+        tireMat.SetFloat("_Metallic", 0.0f);
+        tireMat.SetFloat("_Smoothness", 0.06f);   // Borracha mate sem reflexo
         tireMat.enableInstancing = true;
 
-        // Freios: Pinça esportiva vermelha racing
+        // Pinça de freio: vermelho lacado
         var caliperMat = new Material(litShader);
         caliperMat.name = "BrakeCaliperRed";
-        caliperMat.SetColor("_BaseColor", new Color(0.95f, 0.06f, 0.12f));
-        caliperMat.SetFloat("_Metallic", 0.40f);
-        caliperMat.SetFloat("_Smoothness", 0.85f);
+        caliperMat.SetColor("_BaseColor", new Color(0.85f, 0.04f, 0.08f));
+        caliperMat.SetFloat("_Metallic", 0.10f);
+        caliperMat.SetFloat("_Smoothness", 0.78f);
 
         // ── 2. CARREGAMENTO DAS MALHAS 3D REAIS DO SUPERCARRO ───────────────────
         EnsureMeshesLoaded();
 
-        // A) LATARIA ESCULPIDA PRINCIPAL (PORTAS, PARA-LAMAS, CAPÔ E TRASEIRA)
+        // A) LATARIA ESCULPIDA PRINCIPAL
         if (cachedBodyMesh != null) {
             var bodyGO = CreateMeshObject("Supercar Body Shell", cachedBodyMesh, paintMat, coach);
-            // Ajustes sutis por modelo de veículo
             if (vehicle.id == "valkyrie_apex") {
                 bodyGO.transform.localScale = new Vector3(1.04f, 0.96f, 1.02f);
             } else if (vehicle.id == "shinobi_rspec") {
@@ -146,7 +151,7 @@ public static class CarVisualsOverhaul {
             }
         }
 
-        // C) FARÓIS DIANTEIROS AUTÊNTICOS EM LED XENÔNIO ILUMINADO
+        // C) FARÓIS EM LED XENÔNIO
         if (cachedHeadlightsMesh != null) {
             var hlMeshGO = CreateMeshObject("Supercar Headlights Mesh", cachedHeadlightsMesh, ledCyanMat, coach);
             if (vehicle.id == "valkyrie_apex") {
@@ -156,33 +161,35 @@ public static class CarVisualsOverhaul {
             }
         }
 
-        // ── 3. PACOTE AERODINÂMICO EM FIBRA DE CARBONO ──────────────────────────
-        // Para a versão Hyper / Drift, adiciona aerofólio traseiro GT de alta sustentação
+        // ── 3. AEROFÓLIO EM FIBRA DE CARBONO ─────────────────────────────────────
         if (vehicle.id == "valkyrie_apex" || vehicle.id == "shinobi_rspec") {
             Mesh wingMesh = GenerateGTWing(vehicle);
             CreateMeshObject("GT Rear Wing", wingMesh, carbonMat, coach);
         }
 
-        // ── 4. ILUMINAÇÃO LED (LANTERNA TRASEIRA E FARÓIS) ──────────────────────
-        // Molduras/lentes fumê das lanternas traseiras (esquerda e direita)
+        // ── 4. ILUMINAÇÃO LED (LANTERNAS + PROJEÇÃO NO ASFALTO) ─────────────────
         Mesh housingMesh = GenerateTailHousing(vehicle);
         var housingGO = CreateMeshObject("Tail light housing", housingMesh, tailHousingMat, coach);
-        if (vehicle.id == "valkyrie_apex") {
-            housingGO.transform.localScale = new Vector3(1.04f, 0.96f, 1.02f);
-        } else if (vehicle.id == "shinobi_rspec") {
-            housingGO.transform.localScale = new Vector3(1.02f, 1.00f, 1.00f);
-        }
+        if (vehicle.id == "valkyrie_apex") housingGO.transform.localScale = new Vector3(1.04f, 0.96f, 1.02f);
+        else if (vehicle.id == "shinobi_rspec") housingGO.transform.localScale = new Vector3(1.02f, 1.00f, 1.00f);
 
-        // Elementos LED das lanternas traseiras (assinatura em Y e terceira luz de freio)
         Mesh tailMesh = GenerateTailLight(vehicle);
         var tailGO = CreateMeshObject("Tail light bar", tailMesh, ledRedMat, coach);
-        if (vehicle.id == "valkyrie_apex") {
-            tailGO.transform.localScale = new Vector3(1.04f, 0.96f, 1.02f);
-        } else if (vehicle.id == "shinobi_rspec") {
-            tailGO.transform.localScale = new Vector3(1.02f, 1.00f, 1.00f);
-        }
+        if (vehicle.id == "valkyrie_apex") tailGO.transform.localScale = new Vector3(1.04f, 0.96f, 1.02f);
+        else if (vehicle.id == "shinobi_rspec") tailGO.transform.localScale = new Vector3(1.02f, 1.00f, 1.00f);
 
-        // Faróis dianteiros afiados com filetes DRL
+        // Luz pontual vermelha traseira — glow no asfalto
+        var tailGlowGO = new GameObject("Car_TailGlow");
+        tailGlowGO.transform.SetParent(coach, false);
+        tailGlowGO.transform.localPosition = new Vector3(0, 0.80f, -2.1f);
+        var tailGlowLight = tailGlowGO.AddComponent<Light>();
+        tailGlowLight.type = LightType.Point;
+        tailGlowLight.color = new Color(1.0f, 0.05f, 0.06f);
+        tailGlowLight.intensity = 1.2f;
+        tailGlowLight.range = 4.5f;
+        tailGlowLight.shadows = LightShadows.None;
+
+        // Faróis em LED com filetes DRL
         Mesh headMesh = GenerateHeadlights(vehicle);
         CreateMeshObject("Headlight clusters", headMesh, ledCyanMat, coach);
 
@@ -192,25 +199,39 @@ public static class CarVisualsOverhaul {
                 var wheel = car.wheelVisuals[i];
                 if (!wheel) continue;
 
-                // Limpa filhos antigos da roda
                 var oldChildren = new List<GameObject>();
                 foreach (Transform child in wheel) oldChildren.Add(child.gameObject);
                 foreach (var child in oldChildren) Object.DestroyImmediate(child);
 
                 bool isLeft = (i % 2 == 0);
 
+                // Pneu — SEMPRE adicionado como cilindro procedural ao redor do aro
+                // Dimensões: diâmetro 0.72m (raio 0.36m), largura 0.24m (típico pneu supercar)
+                var tireGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                tireGO.name = "Tire";
+                tireGO.transform.SetParent(wheel, false);
+                tireGO.transform.localRotation = Quaternion.Euler(0, 0, 90f);
+                tireGO.transform.localScale = new Vector3(0.72f, 0.12f, 0.72f);
+                Object.DestroyImmediate(tireGO.GetComponent<Collider>());
+                tireGO.GetComponent<Renderer>().sharedMaterial = tireMat;
+
                 if (cachedWheelMesh != null) {
+                    // Aro 3D carregado do OBJ — fica dentro do pneu
                     var wheelGO = CreateMeshObject("Wheel Mesh", cachedWheelMesh, wheelRimMat, wheel);
-                    if (!isLeft) {
-                        // Inverte o aro direito para face externa ficar para fora
-                        wheelGO.transform.localRotation = Quaternion.Euler(0, 180f, 0);
-                    }
+                    wheelGO.transform.localScale = new Vector3(0.96f, 0.96f, 0.96f);
+                    if (!isLeft) wheelGO.transform.localRotation = Quaternion.Euler(0, 180f, 0);
                 } else {
-                    // Fallback com roda procedural raiada
-                    RebuildProceduralWheel(wheel, isLeft, wheelRimMat, tireMat);
+                    // Aro procedural de fallback
+                    var rimGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    rimGO.name = "Rim";
+                    rimGO.transform.SetParent(wheel, false);
+                    rimGO.transform.localRotation = Quaternion.Euler(0, 0, 90f);
+                    rimGO.transform.localScale = new Vector3(0.56f, 0.13f, 0.56f);
+                    Object.DestroyImmediate(rimGO.GetComponent<Collider>());
+                    rimGO.GetComponent<Renderer>().sharedMaterial = wheelRimMat;
                 }
 
-                // Pinça de freio vermelha racing fixada
+                // Pinça de freio vermelha
                 var caliperGO = CreateMeshObject("Brake Caliper", CreateCaliperMesh(), caliperMat, wheel);
                 caliperGO.transform.localPosition = new Vector3(isLeft ? 0.04f : -0.04f, 0.16f, 0.08f);
                 caliperGO.transform.localRotation = Quaternion.Euler(0, 0, isLeft ? 22f : -22f);

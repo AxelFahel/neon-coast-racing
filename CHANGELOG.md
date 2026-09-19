@@ -7,6 +7,19 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [0.2.2] - 2026-09-19
+
+### Modificado
+- **Pós-Processamento e Iluminação Noturna (`NeonNight.asset`)**:
+  - Ajuste de Tonemapping para modo Neutro e Bloom com Clamp a 10.0, eliminando superexposição e burnouts brancos em luzes intensas.
+- **Visual dos Carros e Rodas (`CarVisualsOverhaul.cs`)**:
+  - Pneus procedurais em cilindro ajustados ao redor dos aros 3D para acabamento impecável.
+  - Adição de luz pontual vermelha sutil sob a traseira (`Car_TailGlow`) projetando luz suave no asfalto.
+- **Sincronização de Cenas e Build**:
+  - Cenas `NeonCoast.unity` e `MainMenu.unity` salvas e sincronizadas nas configurações do projeto.
+
+---
+
 ## [0.2.1] - 2026-09-19
 
 ### Corrigido
