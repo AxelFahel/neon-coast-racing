@@ -17,6 +17,11 @@ public class PaceDriver : MonoBehaviour {
     float currentLane;
     float stuckTime;
     float reverseTimer;
+    int reverseAttempts;
+    float upsideDownTimer;
+    float wrongWayTimer;
+    float lastMoveCheckTimer;
+    Vector3 lastCheckPos;
     int closest;
 
     // Constantes de tunelamento e navegação
@@ -248,29 +253,75 @@ public class PaceDriver : MonoBehaviour {
                           aggression > 0.4f;
         }
 
-        // ── 9. Detecção de Bloqueio & Recuperação Inteligente ────────────────
-        if (car.controlsEnabled && car.SpeedKmh < 2.0f && reverseTimer <= 0) {
-            stuckTime += Time.deltaTime;
+        // ── 9. Detecção de Bloqueio, Capotamento & Recuperação Instantânea ────
+        Vector3 trackForward = (path[(closest + 1) % path.Length] - path[closest]).normalized;
+
+        // A) Detecção de carro tombado / capotado (teto ou lateral encostando)
+        if (transform.up.y < 0.55f) {
+            upsideDownTimer += Time.deltaTime;
         } else {
-            stuckTime = Mathf.Max(0, stuckTime - Time.deltaTime * 0.5f);
+            upsideDownTimer = 0f;
         }
 
-        // Tenta ré antes de forçar o reset total
-        if (stuckTime > StuckThreshold && reverseTimer <= 0) {
-            reverseTimer = 1.2f;
-            stuckTime = 0;
+        // B) Detecção de carro na contramão após batida/rodada
+        bool facingWrongWay = Vector3.Dot(transform.forward, trackForward) < -0.2f && car.SpeedKmh < 16f;
+        if (facingWrongWay) {
+            wrongWayTimer += Time.deltaTime;
+        } else {
+            wrongWayTimer = 0f;
         }
 
-        // Reset completo se capotar, cair ou permanecer travado após a tentativa de ré
-        bool fellOffTrack = transform.position.y < path[closest].y - 5.5f;
-        if (stuckTime > (StuckThreshold * 2.5f) || fellOffTrack) {
-            Vector3 forward = (path[(closest + 1) % path.Length] - path[closest]).normalized;
-            car.SetSpawn(
-                path[closest] + Vector3.Cross(Vector3.up, forward) * laneOffset + Vector3.up * 0.8f,
-                Quaternion.LookRotation(forward));
+        // C) Detecção de carro travado contra guard-rails ou obstáculos por deslocamento real
+        lastMoveCheckTimer += Time.deltaTime;
+        if (lastMoveCheckTimer >= 0.7f) {
+            float distMoved = Vector3.Distance(transform.position, lastCheckPos);
+            lastCheckPos = transform.position;
+            lastMoveCheckTimer = 0f;
+
+            if (car.controlsEnabled && distMoved < 0.8f && reverseTimer <= 0) {
+                stuckTime += 0.7f;
+            } else if (distMoved > 2.0f) {
+                stuckTime = Mathf.Max(0, stuckTime - 0.7f);
+                reverseAttempts = 0;
+            }
+        }
+
+        // D) Tenta 1 manobra rápida de ré antes de forçar o reset
+        if (stuckTime >= 1.0f && reverseTimer <= 0 && reverseAttempts == 0) {
+            reverseTimer = 0.8f;
+            reverseAttempts = 1;
+        }
+
+        // E) Recuperação definitiva para a pista:
+        // Aciona se: capotado (>0.7s), na contramão (>1.2s), travado após ré (stuckTime >= 2.0s),
+        // ou se despencou da pista (Y baixo ou muito afastado)
+        bool fellOffTrack = transform.position.y < path[closest].y - 4.5f;
+        bool tooFarOffTrack = Vector3.Distance(transform.position, path[closest]) > 13.5f;
+        bool needsRespawn = (upsideDownTimer > 0.7f) ||
+                            (wrongWayTimer > 1.2f) ||
+                            (stuckTime >= 2.0f) ||
+                            fellOffTrack ||
+                            tooFarOffTrack;
+
+        if (needsRespawn) {
+            Vector3 respawnPos = path[closest] + Vector3.Cross(Vector3.up, trackForward) * laneOffset + Vector3.up * 0.75f;
+            Quaternion respawnRot = Quaternion.LookRotation(trackForward);
+            car.SetSpawn(respawnPos, respawnRot);
             car.ResetCar();
-            stuckTime = 0;
-            reverseTimer = 0;
+
+            // Impulso imediato para o carro reintegrar a corrida sem ficar inerte
+            var rb = GetComponent<Rigidbody>();
+            if (rb) {
+                rb.linearVelocity = trackForward * Mathf.Max(12f, cruiseSpeed * 0.55f);
+                rb.angularVelocity = Vector3.zero;
+            }
+
+            stuckTime = 0f;
+            reverseTimer = 0f;
+            reverseAttempts = 0;
+            upsideDownTimer = 0f;
+            wrongWayTimer = 0f;
+            lastCheckPos = respawnPos;
             Recoveries++;
         }
     }

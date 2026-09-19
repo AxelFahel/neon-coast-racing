@@ -6,6 +6,46 @@ public class CarEffects : MonoBehaviour {
  AudioSource engine, screech, wind, nitroSfx, impactSrc;
  AudioClip engineClip, screechClip, windClip, nitroClip, impactClip;
  ParticleSystem[] exhaust; ParticleSystem sparkSystem;
+ TrailRenderer[] exhaustTrails;
+ Light[] exhaustLights;
+ static Texture2D softGlowTex;
+ static Material nitroMat;
+
+ static Material GetNitroMaterial() {
+  if (nitroMat != null) return nitroMat;
+  int res = 64;
+  softGlowTex = new Texture2D(res, res, TextureFormat.RGBA32, false);
+  softGlowTex.name = "SoftGlowTexture";
+  softGlowTex.filterMode = FilterMode.Bilinear;
+  softGlowTex.wrapMode = TextureWrapMode.Clamp;
+  Color[] cols = new Color[res * res];
+  float center = (res - 1) * 0.5f;
+  for (int y = 0; y < res; y++) {
+   for (int x = 0; x < res; x++) {
+    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(center, center)) / center;
+    float alpha = Mathf.Clamp01(1f - dist);
+    alpha = alpha * alpha * (3f - 2f * alpha); // Smoothstep circular falloff
+    cols[y * res + x] = new Color(1f, 1f, 1f, alpha);
+   }
+  }
+  softGlowTex.SetPixels(cols);
+  softGlowTex.Apply();
+
+  var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit")
+            ?? Shader.Find("Particles/Standard Unlit")
+            ?? Shader.Find("Mobile/Particles/Additive")
+            ?? Shader.Find("Unlit/Transparent");
+  nitroMat = new Material(shader);
+  nitroMat.name = "NitroGlowPlasma";
+  if (nitroMat.HasProperty("_BaseMap")) nitroMat.SetTexture("_BaseMap", softGlowTex);
+  if (nitroMat.HasProperty("_MainTex")) nitroMat.SetTexture("_MainTex", softGlowTex);
+  if (nitroMat.HasProperty("_BaseColor")) nitroMat.SetColor("_BaseColor", Color.white);
+  if (nitroMat.HasProperty("_Color")) nitroMat.SetColor("_Color", Color.white);
+  nitroMat.SetFloat("_Surface", 1); // Transparent
+  nitroMat.SetFloat("_Blend", 1);   // Additive
+  nitroMat.renderQueue = 3100;
+  return nitroMat;
+ }
 
  void Start(){
   car=GetComponent<ArcadeCar>(); isPlayer=!car.automation;
@@ -14,6 +54,8 @@ public class CarEffects : MonoBehaviour {
   engine=Src(.075f,true,.65f,4,65);
   engineClip=SynthEngine(); engine.clip=engineClip; engine.Play();
 
+  var pMat = GetNitroMaterial();
+
   // Player-only audio + VFX
   if(isPlayer){
    screech=Src(0,true,.7f,3,35); screechClip=SynthBandNoise(8192,3200,600,77); screech.clip=screechClip; screech.Play();
@@ -21,27 +63,97 @@ public class CarEffects : MonoBehaviour {
    nitroSfx=Src(0,true,.5f,3,45); nitroClip=SynthNitro(); nitroSfx.clip=nitroClip; nitroSfx.Play();
    impactSrc=Src(0,false,.85f,2,30); impactClip=SynthImpact(); impactSrc.clip=impactClip;
 
-   // Collision sparks particle system
+   // Collision sparks particle system (faíscas esticadas, sem blocos)
    var sparkGO=new GameObject("Collision Sparks");sparkGO.transform.SetParent(transform,false);
    sparkSystem=sparkGO.AddComponent<ParticleSystem>();sparkSystem.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
-   var sm=sparkSystem.main;sm.playOnAwake=false;sm.startLifetime=new ParticleSystem.MinMaxCurve(.08f,.35f);sm.startSpeed=new ParticleSystem.MinMaxCurve(5,14);
-   sm.startSize=new ParticleSystem.MinMaxCurve(.015f,.05f);sm.startColor=new Color(1,.75f,.25f);sm.gravityModifier=3;sm.maxParticles=60;sm.simulationSpace=ParticleSystemSimulationSpace.World;
+   var sm=sparkSystem.main;sm.playOnAwake=false;sm.startLifetime=new ParticleSystem.MinMaxCurve(.08f,.35f);sm.startSpeed=new ParticleSystem.MinMaxCurve(6,16);
+   sm.startSize=new ParticleSystem.MinMaxCurve(.04f,.10f);sm.startColor=new Color(1f,.85f,.35f);sm.gravityModifier=3.5f;sm.maxParticles=80;sm.simulationSpace=ParticleSystemSimulationSpace.World;
    var se=sparkSystem.emission;se.enabled=false;
    var ss=sparkSystem.shape;ss.shapeType=ParticleSystemShapeType.Hemisphere;ss.radius=.15f;
-   sparkGO.GetComponent<ParticleSystemRenderer>().sharedMaterial=Resources.Load<Material>("NitroParticle");
+   var sr=sparkGO.GetComponent<ParticleSystemRenderer>();
+   sr.sharedMaterial=pMat;
+   sr.renderMode=ParticleSystemRenderMode.Stretch;
+   sr.velocityScale=0.06f;
+   sr.lengthScale=2.2f;
 
    // Auto-attach skidmarks
    if(!GetComponent<Skidmarks>()) gameObject.AddComponent<Skidmarks>();
   }
 
-  // Exhaust particles — all cars
+  // Exhaust particles & jet trails — all cars
   exhaust=new ParticleSystem[2];
+  exhaustTrails=new TrailRenderer[2];
+  exhaustLights=new Light[2];
+
   for(int i=0;i<2;i++){
-   var go=new GameObject("Nitro exhaust");go.transform.SetParent(transform,false);go.transform.localPosition=new Vector3(i==0?-.65f:.65f,.35f,-2.18f);go.transform.localRotation=Quaternion.Euler(0,180,0);
-   var ps=go.AddComponent<ParticleSystem>();ps.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
-   var main=ps.main;main.playOnAwake=false;main.startLifetime=.12f;main.startSpeed=5;main.startSize=.17f;main.startColor=new Color(.1f,.8f,1);main.maxParticles=40;main.simulationSpace=ParticleSystemSimulationSpace.World;
-   var em=ps.emission;em.rateOverTime=80;var shape=ps.shape;shape.shapeType=ParticleSystemShapeType.Cone;shape.angle=8;shape.radius=.04f;
-   var renderer=ps.GetComponent<ParticleSystemRenderer>();renderer.sharedMaterial=Resources.Load<Material>("NitroParticle");exhaust[i]=ps;
+   var go=new GameObject("Nitro exhaust " + i);
+   go.transform.SetParent(transform,false);
+   go.transform.localPosition=new Vector3(i==0?-.58f:.58f,.38f,-2.22f);
+   go.transform.localRotation=Quaternion.Euler(0,180,0);
+
+   var ps=go.AddComponent<ParticleSystem>();
+   ps.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
+   var main=ps.main;
+   main.playOnAwake=false;
+   main.startLifetime=new ParticleSystem.MinMaxCurve(0.08f, 0.16f);
+   main.startSpeed=new ParticleSystem.MinMaxCurve(8f, 15f);
+   main.startSize=new ParticleSystem.MinMaxCurve(0.12f, 0.28f);
+   main.startColor=new Color(0.2f, 0.85f, 1.0f, 0.9f);
+   main.maxParticles=60;
+   main.simulationSpace=ParticleSystemSimulationSpace.World;
+
+   var em=ps.emission;
+   em.rateOverTime=100;
+
+   var shape=ps.shape;
+   shape.shapeType=ParticleSystemShapeType.Cone;
+   shape.angle=6f;
+   shape.radius=0.035f;
+
+   // Curva de tamanho e opacidade ao longo da vida (suave, sem quads/blocos)
+   var sol=ps.sizeOverLifetime;
+   sol.enabled=true;
+   AnimationCurve sizeCurve=new AnimationCurve(new Keyframe(0f, 0.4f), new Keyframe(0.3f, 1f), new Keyframe(1f, 0.1f));
+   sol.size=new ParticleSystem.MinMaxCurve(1f, sizeCurve);
+
+   var col=ps.colorOverLifetime;
+   col.enabled=true;
+   Gradient grad=new Gradient();
+   grad.SetKeys(
+    new GradientColorKey[] { new GradientColorKey(new Color(0.8f, 0.95f, 1f), 0f), new GradientColorKey(new Color(0.05f, 0.7f, 1f), 0.5f), new GradientColorKey(new Color(0.3f, 0.1f, 0.9f), 1f) },
+    new GradientAlphaKey[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.8f, 0.4f), new GradientAlphaKey(0f, 1f) }
+   );
+   col.color=grad;
+
+   var renderer=ps.GetComponent<ParticleSystemRenderer>();
+   renderer.sharedMaterial=pMat;
+   renderer.renderMode=ParticleSystemRenderMode.Billboard;
+   exhaust[i]=ps;
+
+   // Fita de fogo/plasma contínuo (TrailRenderer) no bocal do escapamento
+   var trailGO=new GameObject("Exhaust Jet Ribbon");
+   trailGO.transform.SetParent(go.transform, false);
+   trailGO.transform.localPosition=Vector3.zero;
+   var tr=trailGO.AddComponent<TrailRenderer>();
+   tr.time=0.07f;
+   tr.startWidth=0.14f;
+   tr.endWidth=0.02f;
+   tr.sharedMaterial=pMat;
+   tr.colorGradient=grad;
+   tr.emitting=false;
+   exhaustTrails[i]=tr;
+
+   // Luz pontual azul ciano no escapamento (ilumina o asfalto e difusor durante nitro)
+   var lightGO=new GameObject("Car_NitroGlow_" + (i==0?"L":"R"));
+   lightGO.transform.SetParent(go.transform, false);
+   lightGO.transform.localPosition=new Vector3(0, 0, 0.2f);
+   var l=lightGO.AddComponent<Light>();
+   l.type=LightType.Point;
+   l.color=new Color(0.1f, 0.8f, 1.0f);
+   l.intensity=0f;
+   l.range=4.2f;
+   l.shadows=LightShadows.None;
+   exhaustLights[i]=l;
   }
  }
 
@@ -66,7 +178,25 @@ public class CarEffects : MonoBehaviour {
    float nitroTarget=car.Boosting?.15f:0;
    nitroSfx.volume=Mathf.Lerp(nitroSfx.volume,nitroTarget,Time.deltaTime*(car.Boosting?12:5));nitroSfx.pitch=car.Boosting?1.1f+Mathf.Sin(Time.time*6)*.05f:1;
   }
-  foreach(var ps in exhaust){if(car.Boosting&&!ps.isPlaying)ps.Play();else if(!car.Boosting&&ps.isPlaying)ps.Stop();}
+
+  // Ativação e pulso das labaredas e jatos de plasma de nitro
+  bool isBoost=car.Boosting;
+  if(exhaust!=null){
+   for(int i=0;i<exhaust.Length;i++){
+    var ps=exhaust[i];
+    if(ps!=null){
+     if(isBoost&&!ps.isPlaying)ps.Play();
+     else if(!isBoost&&ps.isPlaying)ps.Stop();
+    }
+    if(exhaustTrails!=null&&i<exhaustTrails.Length&&exhaustTrails[i]!=null){
+     exhaustTrails[i].emitting=isBoost;
+    }
+    if(exhaustLights!=null&&i<exhaustLights.Length&&exhaustLights[i]!=null){
+     float targetIntensity=isBoost?2.8f:0f;
+     exhaustLights[i].intensity=Mathf.Lerp(exhaustLights[i].intensity,targetIntensity,Time.deltaTime*18f);
+    }
+   }
+  }
  }
 
  void OnCollisionEnter(Collision col){

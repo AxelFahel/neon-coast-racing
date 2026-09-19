@@ -23,6 +23,11 @@ public class RaceSession : MonoBehaviour {
   RecordLap=PlayerPrefs.GetFloat("NCR_BestLap",float.PositiveInfinity);RecordRace=PlayerPrefs.GetFloat("NCR_BestRace",float.PositiveInfinity);
   if(GameMode.TimeTrial){foreach(var d in FindObjectsByType<PaceDriver>(FindObjectsSortMode.None))d.gameObject.SetActive(false);racers=new GridRacer[]{playerRacer};}
   else { RandomizeStartingGrid(); }
+
+  // Garante que o público e pedestres estejam presentes no circuito
+  if (!FindFirstObjectByType<TrackSpectators>()) {
+   new GameObject("Track Spectators").AddComponent<TrackSpectators>();
+  }
  }
 
  struct GridSlot {

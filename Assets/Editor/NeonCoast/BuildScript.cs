@@ -48,6 +48,16 @@ public static class NCRBuildScript {
      EditorUtility.SetDirty(car.gameObject);
     }
    }
+
+   // Gera o público e pedestres nas calçadas e fora da pista
+   var spectators = Object.FindFirstObjectByType<NeonCoast.TrackSpectators>();
+   if (!spectators) {
+    var specGO = new GameObject("Track Spectators");
+    spectators = specGO.AddComponent<NeonCoast.TrackSpectators>();
+   }
+   spectators.SpawnAllSpectators();
+   EditorUtility.SetDirty(spectators.gameObject);
+
    EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
    EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
   } catch (System.Exception e) {

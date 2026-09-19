@@ -287,32 +287,30 @@ public class ArcadeCar : MonoBehaviour {
     Quaternion.Euler(throttle * -1.1f, 0, -smoothedSteer * Mathf.Clamp(SpeedKmh / 45f, 0, 2)),
     Time.deltaTime * BodyTiltSpeed);
 
-   // Dynamic brake lights — modula LEDs e luz de glow no asfalto
+   // Dynamic brake lights — modula emissão de LED e luz de glow no asfalto
    {
     bool isBraking = (throttle * ForwardSpeed < -1.2f) || handbrake;
-    // Cores em HDR: normal = 2.8 (glow vermelho suave), freio = 6.0 (LED vivo)
-    Color normalHDR  = new Color(2.8f, 0.04f, 0.06f);
-    Color brakingHDR = new Color(6.0f, 0.05f, 0.08f);
-    Color targetCol  = isBraking ? brakingHDR : normalHDR;
+    Color pureRed = new Color(0.95f, 0.02f, 0.04f, 1f);
+    // Emissão em HDR para bloom neon: normal = 1.9 (vermelho vivo), freio = 4.2 (LED hiper-brilhante)
+    Color normalEmission  = new Color(1.9f, 0.02f, 0.03f);
+    Color brakingEmission = new Color(4.2f, 0.03f, 0.05f);
+    Color targetEmission  = isBraking ? brakingEmission : normalEmission;
 
     foreach (var mat in tailLightMats) {
      if (!mat) continue;
-     if (mat.HasProperty("_BaseColor")) {
-      mat.SetColor("_BaseColor", Color.Lerp(mat.GetColor("_BaseColor"), targetCol, Time.deltaTime * 14f));
-     }
-     if (mat.HasProperty("_Color")) {
-      mat.SetColor("_Color", Color.Lerp(mat.GetColor("_Color"), targetCol, Time.deltaTime * 14f));
-     }
+     // BaseColor NUNCA ultrapassa 1.0 para nunca desbotar ou ficar branco
+     if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", pureRed);
+     if (mat.HasProperty("_Color")) mat.SetColor("_Color", pureRed);
      if (mat.HasProperty("_EmissionColor")) {
-      mat.SetColor("_EmissionColor", Color.Lerp(mat.GetColor("_EmissionColor"), targetCol, Time.deltaTime * 14f));
+      mat.SetColor("_EmissionColor", Color.Lerp(mat.GetColor("_EmissionColor"), targetEmission, Time.deltaTime * 16f));
      }
     }
 
-    // Modula a intensidade da luz pontual de glow traseiro
+    // Modula a intensidade da luz pontual de glow traseiro no asfalto
     var tailGlowT = bodyVisual ? bodyVisual.Find("Car_TailGlow") : transform.Find("Car_TailGlow");
     if (tailGlowT) {
      var tgl = tailGlowT.GetComponent<Light>();
-     if (tgl) tgl.intensity = Mathf.Lerp(tgl.intensity, isBraking ? 2.8f : 1.2f, Time.deltaTime * 14f);
+     if (tgl) tgl.intensity = Mathf.Lerp(tgl.intensity, isBraking ? 3.0f : 1.2f, Time.deltaTime * 16f);
     }
    }
 

@@ -15,6 +15,7 @@ public static class CarVisualsOverhaul {
     static Mesh cachedGlassMesh;
     static Mesh cachedHeadlightsMesh;
     static Mesh cachedWheelMesh;
+    static Mesh cachedTireMesh;
 
     public static void RebuildCarVisuals(ArcadeCar car, VehicleData vehicle, PaintData paintData) {
         if (!car) return;
@@ -41,20 +42,17 @@ public static class CarVisualsOverhaul {
         var unlitShader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? litShader;
 
         // Pintura automotiva realista — camada base + clearcoat (verniz)
-        // Metálico 0.0 = pigmento puro (não é metal), smoothness alta = verniz polido
         var paintMat = new Material(litShader);
         paintMat.name = "SupercarPaint_" + paintData.name;
-        // Escurece levemente a cor base para o verniz parecer mais profundo
         Color paintBase = paintData.color * 0.82f;
         paintBase.a = 1f;
         paintMat.SetColor("_BaseColor", paintBase);
         paintMat.SetFloat("_Metallic", 0.0f);       // Tinta não é metal — especular é do verniz
         paintMat.SetFloat("_Smoothness", 0.92f);     // Verniz automotivo muito polido
-        // Sem emissão — pintura não emite luz, brilha pelo especular
         paintMat.SetFloat("_Cull", 0f);
         paintMat.enableInstancing = true;
 
-        // Vidro automotivo escurecido — levemente tintado e refletivo
+        // Vidro automotivo escurecido fumê refletivo
         var glassMat = new Material(litShader);
         glassMat.name = "SupercarGlass";
         glassMat.SetColor("_BaseColor", new Color(0.05f, 0.07f, 0.12f, 0.85f));
@@ -63,7 +61,7 @@ public static class CarVisualsOverhaul {
         glassMat.SetFloat("_Cull", 0f);
         glassMat.enableInstancing = true;
 
-        // Fibra de carbono — surface rugosa com reflexo cruzado
+        // Fibra de carbono — acabamento acetinado com trama
         var carbonMat = new Material(litShader);
         carbonMat.name = "SupercarCarbon";
         carbonMat.SetColor("_BaseColor", new Color(0.06f, 0.07f, 0.08f));
@@ -72,61 +70,61 @@ public static class CarVisualsOverhaul {
         carbonMat.SetFloat("_Cull", 0f);
         carbonMat.enableInstancing = true;
 
-        // Lente fumê da lanterna traseira (housing escuro com reflexo)
+        // Moldura/lente das lanternas traseiras (vidro rubi escurecido automotivo — nunca preto puro)
         var tailHousingMat = new Material(litShader);
         tailHousingMat.name = "SupercarTailHousing";
-        tailHousingMat.SetColor("_BaseColor", new Color(0.03f, 0.03f, 0.04f));
+        tailHousingMat.SetColor("_BaseColor", new Color(0.22f, 0.02f, 0.035f, 0.96f));
         tailHousingMat.SetFloat("_Metallic", 0.0f);
-        tailHousingMat.SetFloat("_Smoothness", 0.90f);
+        tailHousingMat.SetFloat("_Smoothness", 0.94f);
         tailHousingMat.SetFloat("_Cull", 0f);
         tailHousingMat.enableInstancing = true;
 
-        // LED traseiro: Lit shader com cor LDR vermelha + emissão HDR para bloom
-        // _BaseColor LDR → aparência visual vermelha nítida
-        // _EmissionColor HDR (>1) → bloom neon ativado corretamente pelo threshold
+        // Elementos LED das lanternas traseiras (vermelho rubi puro e vivo — nítido, sem desbotar para branco)
         var ledRedMat = new Material(litShader);
         ledRedMat.name = "SupercarTailLED";
-        ledRedMat.SetColor("_BaseColor", new Color(0.90f, 0.03f, 0.05f));
+        Color baseTailRed = new Color(0.96f, 0.02f, 0.04f, 1f);
+        ledRedMat.SetColor("_BaseColor", baseTailRed);
+        ledRedMat.SetColor("_Color", baseTailRed);
         ledRedMat.SetFloat("_Metallic", 0.0f);
-        ledRedMat.SetFloat("_Smoothness", 0.88f);          // Lente LED polida
+        ledRedMat.SetFloat("_Smoothness", 0.90f);          // Lente LED polida
         ledRedMat.EnableKeyword("_EMISSION");
-        // HDR: R=3.2 → bloom vermelho intenso sem branco
-        ledRedMat.SetColor("_EmissionColor", new Color(3.2f, 0.04f, 0.06f));
+        // Emissão calibrada: vermelho neon nítido que não satura nem estoura para branco
+        ledRedMat.SetColor("_EmissionColor", new Color(2.1f, 0.02f, 0.03f));
         ledRedMat.SetFloat("_Cull", 0f);
         ledRedMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
 
-        // Faróis: Lit com emissão HDR branco-frio (xenônio/LED)
+        // Faróis: Xenônio / LED branco-frio com reflexo cristalino
         var ledCyanMat = new Material(litShader);
         ledCyanMat.name = "SupercarHeadLED";
-        ledCyanMat.SetColor("_BaseColor", new Color(0.88f, 0.94f, 1.0f));
+        ledCyanMat.SetColor("_BaseColor", new Color(0.90f, 0.95f, 1.0f));
         ledCyanMat.SetFloat("_Metallic", 0.0f);
-        ledCyanMat.SetFloat("_Smoothness", 0.90f);
+        ledCyanMat.SetFloat("_Smoothness", 0.92f);
         ledCyanMat.EnableKeyword("_EMISSION");
-        ledCyanMat.SetColor("_EmissionColor", new Color(2.6f, 2.9f, 3.2f));   // HDR branco-frio
+        ledCyanMat.SetColor("_EmissionColor", new Color(2.5f, 2.8f, 3.0f));   // HDR branco-frio
         ledCyanMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
 
-        // Aro da roda: alumínio forjado escovado
+        // Aro da roda: alumínio forjado usinado com brilho metálico
         var wheelRimMat = new Material(litShader);
         wheelRimMat.name = "WheelAlloy";
-        wheelRimMat.SetColor("_BaseColor", new Color(0.55f, 0.56f, 0.60f));
-        wheelRimMat.SetFloat("_Metallic", 0.95f);
-        wheelRimMat.SetFloat("_Smoothness", 0.72f);
+        wheelRimMat.SetColor("_BaseColor", new Color(0.62f, 0.63f, 0.66f));
+        wheelRimMat.SetFloat("_Metallic", 0.92f);
+        wheelRimMat.SetFloat("_Smoothness", 0.74f);
         wheelRimMat.enableInstancing = true;
 
-        // Pneu: borracha vulcanizada preta mate
+        // Pneu: borracha vulcanizada preta mate de alta aderência
         var tireMat = new Material(litShader);
         tireMat.name = "TireRubber";
-        tireMat.SetColor("_BaseColor", new Color(0.055f, 0.055f, 0.06f));
+        tireMat.SetColor("_BaseColor", new Color(0.065f, 0.065f, 0.07f));
         tireMat.SetFloat("_Metallic", 0.0f);
-        tireMat.SetFloat("_Smoothness", 0.06f);   // Borracha mate sem reflexo
+        tireMat.SetFloat("_Smoothness", 0.12f);   // Borracha acetinada/mate realista
         tireMat.enableInstancing = true;
 
-        // Pinça de freio: vermelho lacado
+        // Pinça de freio: vermelho esportivo lacado
         var caliperMat = new Material(litShader);
         caliperMat.name = "BrakeCaliperRed";
-        caliperMat.SetColor("_BaseColor", new Color(0.85f, 0.04f, 0.08f));
+        caliperMat.SetColor("_BaseColor", new Color(0.88f, 0.04f, 0.08f));
         caliperMat.SetFloat("_Metallic", 0.10f);
-        caliperMat.SetFloat("_Smoothness", 0.78f);
+        caliperMat.SetFloat("_Smoothness", 0.80f);
 
         // ── 2. CARREGAMENTO DAS MALHAS 3D REAIS DO SUPERCARRO ───────────────────
         EnsureMeshesLoaded();
@@ -205,30 +203,18 @@ public static class CarVisualsOverhaul {
 
                 bool isLeft = (i % 2 == 0);
 
-                // Pneu — SEMPRE adicionado como cilindro procedural ao redor do aro
-                // Dimensões: diâmetro 0.72m (raio 0.36m), largura 0.24m (típico pneu supercar)
-                var tireGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                tireGO.name = "Tire";
-                tireGO.transform.SetParent(wheel, false);
-                tireGO.transform.localRotation = Quaternion.Euler(0, 0, 90f);
-                tireGO.transform.localScale = new Vector3(0.72f, 0.12f, 0.72f);
-                Object.DestroyImmediate(tireGO.GetComponent<Collider>());
-                tireGO.GetComponent<Renderer>().sharedMaterial = tireMat;
+                // Pneu 3D realista de perfil esportivo com ombro arredondado e parede lateral convexa
+                var tireGO = CreateMeshObject("Performance Tire", GenerateTireMesh(), tireMat, wheel);
+                tireGO.transform.localPosition = Vector3.zero;
+                tireGO.transform.localRotation = Quaternion.identity;
 
                 if (cachedWheelMesh != null) {
-                    // Aro 3D carregado do OBJ — fica dentro do pneu
+                    // Aro 3D carregado do OBJ — fica perfeitamente assentado dentro do pneu
                     var wheelGO = CreateMeshObject("Wheel Mesh", cachedWheelMesh, wheelRimMat, wheel);
                     wheelGO.transform.localScale = new Vector3(0.96f, 0.96f, 0.96f);
                     if (!isLeft) wheelGO.transform.localRotation = Quaternion.Euler(0, 180f, 0);
                 } else {
-                    // Aro procedural de fallback
-                    var rimGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    rimGO.name = "Rim";
-                    rimGO.transform.SetParent(wheel, false);
-                    rimGO.transform.localRotation = Quaternion.Euler(0, 0, 90f);
-                    rimGO.transform.localScale = new Vector3(0.56f, 0.13f, 0.56f);
-                    Object.DestroyImmediate(rimGO.GetComponent<Collider>());
-                    rimGO.GetComponent<Renderer>().sharedMaterial = wheelRimMat;
+                    RebuildProceduralWheel(wheel, isLeft, wheelRimMat, tireMat);
                 }
 
                 // Pinça de freio vermelha
@@ -496,21 +482,21 @@ public static class CarVisualsOverhaul {
                 float x1 = Mathf.Lerp(xIn, xOut, t1);
                 Vector3 pTop0 = new Vector3(x0, 0.935f, ZLED(x0));
                 Vector3 pTop1 = new Vector3(x1, 0.935f, ZLED(x1));
-                AddRibbon(verts, uvs, triangles, pTop0, pTop1, 0.006f);
+                AddRibbon(verts, uvs, triangles, pTop0, pTop1, 0.014f);
 
                 Vector3 pBot0 = new Vector3(x0, 0.845f, ZLED(x0));
                 Vector3 pBot1 = new Vector3(x1, 0.845f, ZLED(x1));
-                AddRibbon(verts, uvs, triangles, pBot0, pBot1, 0.005f);
+                AddRibbon(verts, uvs, triangles, pBot0, pBot1, 0.014f);
             }
 
             // Fechamento lateral do cluster da lanterna
             Vector3 cOutBot = new Vector3(xOut, 0.845f, ZLED(xOut));
             Vector3 cOutTop = new Vector3(xOut, 0.935f, ZLED(xOut));
-            AddRibbon(verts, uvs, triangles, cOutBot, cOutTop, 0.006f);
+            AddRibbon(verts, uvs, triangles, cOutBot, cOutTop, 0.014f);
 
             Vector3 cInBot = new Vector3(xIn, 0.845f, ZLED(xIn));
             Vector3 cInTop = new Vector3(xIn, 0.935f, ZLED(xIn));
-            AddRibbon(verts, uvs, triangles, cInBot, cInTop, 0.005f);
+            AddRibbon(verts, uvs, triangles, cInBot, cInTop, 0.014f);
 
             // Assinatura icônica Lamborghini: 3 flechas 'Y' nítidas dentro da lanterna
             foreach (float cx in chevronX) {
@@ -525,9 +511,9 @@ public static class CarVisualsOverhaul {
                 Vector3 pBot  = new Vector3(xInner, yBot, ZLED(xInner));
                 Vector3 pStem = new Vector3(s * (cx - 0.055f), yMid, ZLED(s * (cx - 0.055f)));
 
-                AddRibbon(verts, uvs, triangles, pTop,  pApex, 0.006f);
-                AddRibbon(verts, uvs, triangles, pBot,  pApex, 0.006f);
-                AddRibbon(verts, uvs, triangles, pStem, pApex, 0.005f);
+                AddRibbon(verts, uvs, triangles, pTop,  pApex, 0.012f);
+                AddRibbon(verts, uvs, triangles, pBot,  pApex, 0.012f);
+                AddRibbon(verts, uvs, triangles, pStem, pApex, 0.012f);
             }
         }
 
@@ -537,7 +523,7 @@ public static class CarVisualsOverhaul {
         float highY = 1.135f;
         Vector3 h0 = new Vector3(-highSpan, highY, -2.260f - 0.010f);
         Vector3 h1 = new Vector3( highSpan, highY, -2.260f - 0.010f);
-        AddRibbon(verts, uvs, triangles, h0, h1, 0.006f);
+        AddRibbon(verts, uvs, triangles, h0, h1, 0.012f);
 
         var mesh = new Mesh { name = "TailLightBar" };
         mesh.SetVertices(verts);
@@ -546,6 +532,81 @@ public static class CarVisualsOverhaul {
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
         return mesh;
+    }
+
+    static Mesh GenerateTireMesh() {
+        if (cachedTireMesh != null) return cachedTireMesh;
+
+        var verts = new List<Vector3>();
+        var uvs = new List<Vector2>();
+        var triangles = new List<int>();
+
+        // Perfil transversal de pneu de supercarro esportivo de perfil baixo
+        // (X = largura pelo eixo, R = raio a partir do centro)
+        Vector2[] profile = new Vector2[] {
+            new Vector2(-0.108f, 0.245f), // Encaixe do talão no aro
+            new Vector2(-0.134f, 0.275f), // Parede lateral inferior
+            new Vector2(-0.140f, 0.320f), // Parede lateral curva
+            new Vector2(-0.132f, 0.348f), // Ombro esportivo arredondado
+            new Vector2(-0.108f, 0.362f), // Borda da banda de rodagem
+            new Vector2(-0.040f, 0.366f), // Banda de rodagem
+            new Vector2( 0.000f, 0.368f), // Coroa central
+            new Vector2( 0.040f, 0.366f), // Banda de rodagem
+            new Vector2( 0.108f, 0.362f), // Borda interna
+            new Vector2( 0.132f, 0.348f), // Ombro interno
+            new Vector2( 0.140f, 0.320f), // Parede lateral interna
+            new Vector2( 0.134f, 0.275f), // Parede lateral interna
+            new Vector2( 0.108f, 0.245f), // Talão interno
+            new Vector2( 0.000f, 0.238f)  // Cama interna
+        };
+
+        const int radialSegments = 32;
+        int pts = profile.Length;
+
+        for (int i = 0; i <= radialSegments; i++) {
+            float angle = (float)i / radialSegments * Mathf.PI * 2f;
+            float cos = Mathf.Cos(angle);
+            float sin = Mathf.Sin(angle);
+
+            for (int j = 0; j < pts; j++) {
+                verts.Add(new Vector3(profile[j].x, cos * profile[j].y, sin * profile[j].y));
+                uvs.Add(new Vector2((float)i / radialSegments * 4f, (float)j / (pts - 1)));
+            }
+        }
+
+        for (int i = 0; i < radialSegments; i++) {
+            for (int j = 0; j < pts - 1; j++) {
+                int a = i * pts + j;
+                int b = (i + 1) * pts + j;
+                int c = (i + 1) * pts + (j + 1);
+                int d = i * pts + (j + 1);
+
+                triangles.Add(a); triangles.Add(b); triangles.Add(c);
+                triangles.Add(a); triangles.Add(c); triangles.Add(d);
+            }
+        }
+
+        cachedTireMesh = new Mesh { name = "SupercarPerformanceTire" };
+        cachedTireMesh.SetVertices(verts);
+        cachedTireMesh.SetUVs(0, uvs);
+        cachedTireMesh.SetTriangles(triangles, 0);
+        cachedTireMesh.RecalculateNormals();
+        cachedTireMesh.RecalculateBounds();
+        return cachedTireMesh;
+    }
+
+    static void RebuildProceduralWheel(Transform wheel, bool isLeft, Material rimMat, Material tireMat) {
+        var tireGO = CreateMeshObject("Performance Tire", GenerateTireMesh(), tireMat, wheel);
+        tireGO.transform.localPosition = Vector3.zero;
+        tireGO.transform.localRotation = Quaternion.identity;
+
+        var rimGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        rimGO.name = "Rim";
+        rimGO.transform.SetParent(wheel, false);
+        rimGO.transform.localRotation = Quaternion.Euler(0, 0, 90f);
+        rimGO.transform.localScale = new Vector3(0.52f, 0.185f, 0.52f);
+        Object.DestroyImmediate(rimGO.GetComponent<Collider>());
+        rimGO.GetComponent<Renderer>().sharedMaterial = rimMat;
     }
 
     static Mesh GenerateHeadlights(VehicleData vehicle) {
@@ -576,25 +637,6 @@ public static class CarVisualsOverhaul {
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
         return mesh;
-    }
-
-    static void RebuildProceduralWheel(Transform wheel, bool isLeft, Material rimMat, Material tireMat) {
-        // Fallback procedural tire & rim
-        var tireGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        tireGO.name = "Tire";
-        tireGO.transform.SetParent(wheel, false);
-        tireGO.transform.localRotation = Quaternion.Euler(0, 0, 90f);
-        tireGO.transform.localScale = new Vector3(0.72f, 0.18f, 0.72f);
-        Object.DestroyImmediate(tireGO.GetComponent<Collider>());
-        tireGO.GetComponent<Renderer>().sharedMaterial = tireMat;
-
-        var rimGO = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        rimGO.name = "Rim";
-        rimGO.transform.SetParent(wheel, false);
-        rimGO.transform.localRotation = Quaternion.Euler(0, 0, 90f);
-        rimGO.transform.localScale = new Vector3(0.52f, 0.185f, 0.52f);
-        Object.DestroyImmediate(rimGO.GetComponent<Collider>());
-        rimGO.GetComponent<Renderer>().sharedMaterial = rimMat;
     }
 
     static Mesh CreateCaliperMesh() {
