@@ -32,10 +32,8 @@ public static class NeonPolish {
   Box("Harbor service road",new Vector3(-74,-.06f,-51),new Vector3(42,.1f,21),road,world,true);
   Box("Service end barrier",new Vector3(-53,.5f,-51),new Vector3(.5f,1,22),concrete,world,true);
   for(int s=-1;s<=1;s+=2)Box("Service boundary",new Vector3(-75,.5f,-51+s*10.8f),new Vector3(44,1,.4f),concrete,world,true);
-  // Headlights and a restrained body fill remain with the car.
+  // Headlights and visuals handled dynamically by ArcadeCar and CarVisualsOverhaul
   var car=Object.FindFirstObjectByType<NeonCoast.ArcadeCar>();
-  for(int s=-1;s<=1;s+=2){var g=new GameObject("Projector headlight");g.transform.SetParent(car.transform,false);g.transform.localPosition=new Vector3(s*.58f,.55f,2.05f);g.transform.localRotation=Quaternion.Euler(5,0,0);var l=g.AddComponent<Light>();l.type=LightType.Spot;l.range=55;l.spotAngle=52;l.intensity=12;l.color=new Color(.7f,.86f,1);l.shadows=LightShadows.None;g.layer=2;}
-  var fill=new GameObject("Paint rim light");fill.transform.SetParent(car.transform,false);fill.transform.localPosition=new Vector3(0,2,-1.5f);var fl=fill.AddComponent<Light>();fl.type=LightType.Point;fl.range=5;fl.intensity=1.4f;fl.color=new Color(.1f,.75f,1);fill.layer=2;
   foreach(var probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None)){probe.clearFlags=ReflectionProbeClearFlags.Skybox;probe.backgroundColor=RenderSettings.fogColor;}
   // Static render batching reduces the cost of the many small architectural details.
   foreach(var r in world.GetComponentsInChildren<MeshRenderer>()) GameObjectUtility.SetStaticEditorFlags(r.gameObject, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic);

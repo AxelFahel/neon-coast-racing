@@ -8,7 +8,7 @@ public class ArcadeCar : MonoBehaviour {
  public float topSpeed = 60f;
 
  public bool automation;
- public bool controlsEnabled = true, aiBoost;
+ public bool controlsEnabled = true, aiBoost, aiHandbrake;
  public float testThrottle, testSteer;
  public float SpeedKmh    => rb ? rb.linearVelocity.magnitude * 3.6f : 0;
  public float ForwardSpeed => rb ? Vector3.Dot(rb.linearVelocity, transform.forward) : 0;
@@ -20,6 +20,7 @@ public class ArcadeCar : MonoBehaviour {
  public float steerAngleMax = 31f, steerAngleMin = 9f;
  public float driftNitroMult = 1.0f, handbrakeGrip = 0.65f;
  public string vehicleName = "ASTER GT";
+ public bool Slipstreaming { get; set; }
 
  Rigidbody rb;
  float throttle, steer, smoothedSteer;
@@ -27,8 +28,8 @@ public class ArcadeCar : MonoBehaviour {
  Vector3 spawn; Quaternion spawnRotation;
  readonly System.Collections.Generic.List<Material> tailLightMats = new System.Collections.Generic.List<Material>();
  Material playerPaint;
- Color tailNormal  = new Color(0.95f, 0.04f, 0.07f) * 1.5f;
- Color tailBraking = new Color(1.0f, 0.06f, 0.08f) * 3.5f;
+ Color tailNormal  = new Color(0.96f, 0.04f, 0.08f) * 1.5f;
+ Color tailBraking = new Color(1.00f, 0.06f, 0.08f) * 3.5f;
 
  // ── Physics constants ─────────────────────────────────────────────────────
  const float RbMass           = 1350f;
@@ -53,9 +54,11 @@ public class ArcadeCar : MonoBehaviour {
   rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
   spawn = transform.position;
   spawnRotation = transform.rotation;
+  CleanExcessiveLights();
  }
 
  void Start() {
+  CleanExcessiveLights();
   if (!automation) ApplyVehicleSpecs();
   else if (GetComponent<GridRacer>() != null) ApplyRivalSpecs();
  }
@@ -116,13 +119,13 @@ public class ArcadeCar : MonoBehaviour {
   string vehId = "aster_gt";
 
   if (rName.Contains("KAI")) {
-   rivalColor = new Color(0.95f, 0.28f, 0.08f); // Coral / Laranja esportivo
+   rivalColor = new Color(0.98f, 0.32f, 0.05f); // Neon Coral / Laranja Hyper
    vehId = "shinobi_rspec";
   } else if (rName.Contains("NOVA")) {
-   rivalColor = new Color(0.72f, 0.18f, 0.95f); // Violeta Neon
+   rivalColor = new Color(0.72f, 0.12f, 0.98f); // Violeta / Roxo Cyberpunk
    vehId = "valkyrie_apex";
   } else {
-   rivalColor = new Color(0.85f, 0.92f, 0.98f); // Prata / Branco Metálico
+   rivalColor = new Color(0.04f, 0.92f, 0.62f); // Verde Esmeralda / Ciano Elétrico
    vehId = "aster_gt";
   }
 
@@ -146,7 +149,7 @@ public class ArcadeCar : MonoBehaviour {
    if (mr.name == "Tail light bar") {
     var tailLightMat = new Material(mr.sharedMaterial);
     tailLightMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
-    tailLightMat.EnableKeyword("_EMISSION");
+    if (tailLightMat.HasProperty("_EmissionColor")) tailLightMat.EnableKeyword("_EMISSION");
     tailLightMats.Add(tailLightMat);
     mr.material = tailLightMat;
    }
@@ -175,8 +178,22 @@ public class ArcadeCar : MonoBehaviour {
   }
  }
 
- void CleanExcessiveLights() {
-  foreach (var n in new string[] { "Car_TailLight_L", "Car_TailLight_R", "Car_RoofFill" }) {
+ public void CleanExcessiveLights() {
+  // Destrói qualquer luz da cena antiga ou rogue que cause clarão branco ofuscante
+  var lights = GetComponentsInChildren<Light>(true);
+  var toDestroy = new System.Collections.Generic.List<GameObject>();
+  foreach (var l in lights) {
+   if (!l) continue;
+   if (l.name != "Car_Headlight_L" && l.name != "Car_Headlight_R" && l.name != "Car_Underglow") {
+    toDestroy.Add(l.gameObject);
+   }
+  }
+  foreach (var g in toDestroy) {
+   if (g != null && g != gameObject) Destroy(g);
+  }
+
+  // Purga GameObjects residuais específicos
+  foreach (var n in new string[] { "Paint rim light", "Projector headlight", "Car_TailLight_L", "Car_TailLight_R", "Car_RoofFill" }) {
    var t = transform.Find(n);
    if (t) Destroy(t.gameObject);
   }
@@ -208,7 +225,7 @@ public class ArcadeCar : MonoBehaviour {
   if (!automation && GameInput.Reset) ResetCar();
   throttle  = automation ? testThrottle : GameInput.Throttle;
   steer     = automation ? testSteer    : GameInput.Steer;
-  handbrake = !automation && GameInput.Handbrake;
+  handbrake = automation ? aiHandbrake  : GameInput.Handbrake;
   boost     = automation ? aiBoost      : GameInput.Boost;
 
   if (transform.position.y < -12) ResetCar();

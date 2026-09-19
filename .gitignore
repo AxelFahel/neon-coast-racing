@@ -50,3 +50,4 @@ crashlytics-build.properties
 # OS generated
 .DS_Store
 Thumbs.db
+*.ps1

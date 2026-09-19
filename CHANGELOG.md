@@ -7,6 +7,25 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [0.2.0] - 2026-09-19
+
+### Adicionado
+- **Suporte Oficial a Redes Neurais com Unity Sentis**:
+  - Inclusão da dependência nativa e gratuita `com.unity.sentis: 2.1.3` no `Packages/manifest.json`.
+- **IA de Pilotagem Competitiva Avançada (`PaceDriver.cs`)**:
+  - **Frenagem Preditiva em Curvas (*Corner Anticipation*)**: Cálculo de curvatura à frente com desaceleração ideal antes do ingresso na curva.
+  - **Traçado Ideal (*Apex Hunting*)**: Linha de corrida inteligente buscando o ápice e otimizando a tangência nas curvas.
+  - **Sistema de Vácuo (*Slipstream*) e Ultrapassagem Ativa**: Detecção de arrasto atrás de oponentes com troca proativa de faixa para manobras de ultrapassagem.
+  - **Gestão Tática de Nitro**: Ativação inteligente do boost em retas, saídas de curvas e disputas diretas.
+  - **Drift com Freio de Mão em Curvas Fechadas (*Hairpin Drift*)**: Controle autônomo de `aiHandbrake` para rotacionar o carro em cotovelos.
+  - **Sensores de Colisão Laterais**: Raycasts direcionais para evitar prensar o jogador ou colidir contra guard-rails.
+  - **Dificuldade Adaptativa (*Rubberbanding*)**: Ajuste dinâmico de ritmo para corridas competitivas do início ao fim.
+  - **Recuperação Inteligente com Manobra de Ré**: Desvencilhamento autônomo ao detectar travamentos contra obstáculos.
+- **Controle de Automação Estendido em `ArcadeCar.cs`**:
+  - Suporte ao campo `aiHandbrake` para automação.
+
+---
+
 ## [0.1.0] - 2026-09-19
 
 ### Adicionado
