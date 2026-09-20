@@ -26,37 +26,39 @@ public static class MainMenuBuilder {
   return font;
  }
 
- static Sprite whiteSprite;
- static Sprite WhiteSprite() {
-  if (whiteSprite) return whiteSprite;
-  whiteSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/NitroSprite.asset");
-  return whiteSprite;
- }
-
  [MenuItem("Neon Coast/Build Main Menu Scene")]
  public static void Build() {
   if (EditorApplication.isPlaying) throw new System.Exception("Stop Play Mode first.");
   var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
   RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-  RenderSettings.ambientLight = Color.black;
+  RenderSettings.ambientLight = new Color(0.18f, 0.24f, 0.35f);
   RenderSettings.fog = false;
 
-  // Camera
+  // Câmera principal focada na vitrine 3D
   var camGO = new GameObject("Main Camera", typeof(Camera), typeof(AudioListener));
   camGO.tag = "MainCamera";
   var cam = camGO.GetComponent<Camera>();
   cam.clearFlags = CameraClearFlags.SolidColor;
-  cam.backgroundColor = new Color(0.015f, 0.02f, 0.04f);
+  cam.backgroundColor = new Color(0.012f, 0.016f, 0.028f);
+  cam.transform.position = new Vector3(0f, 1.25f, -6f);
+  cam.transform.rotation = Quaternion.Euler(6f, 0f, 0f);
 
-  // Subtle directional light
-  var lightGO = new GameObject("Ambient Light", typeof(Light));
-  var l = lightGO.GetComponent<Light>();
-  l.type = LightType.Directional;
-  l.intensity = 0.5f;
-  l.color = new Color(0.4f, 0.6f, 1f);
-  l.transform.rotation = Quaternion.Euler(40, -30, 0);
+  // Iluminação de estúdio automotivo
+  var keyLightGO = new GameObject("Studio Key Light", typeof(Light));
+  var keyL = keyLightGO.GetComponent<Light>();
+  keyL.type = LightType.Directional;
+  keyL.intensity = 1.4f;
+  keyL.color = new Color(0.92f, 0.95f, 1f);
+  keyL.transform.rotation = Quaternion.Euler(38f, -25f, 0f);
 
-  // Canvas
+  var rimLightGO = new GameObject("Studio Rim Light", typeof(Light));
+  var rimL = rimLightGO.GetComponent<Light>();
+  rimL.type = LightType.Directional;
+  rimL.intensity = 0.8f;
+  rimL.color = new Color(0.1f, 0.85f, 1f);
+  rimL.transform.rotation = Quaternion.Euler(-20f, 150f, 0f);
+
+  // Canvas ScreenSpaceOverlay
   var canvasGO = new GameObject("Main Menu Canvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(CanvasGroup), typeof(MainMenu));
   var canvas = canvasGO.GetComponent<Canvas>();
   canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -69,31 +71,33 @@ public static class MainMenuBuilder {
   var menu = canvasGO.GetComponent<MainMenu>();
   menu.canvasGroup = cg;
 
-  // Background gradient/tint panel
-  var bgGO = new GameObject("Background", typeof(RectTransform), typeof(Image));
-  bgGO.transform.SetParent(canvasGO.transform, false);
-  var bgRT = bgGO.GetComponent<RectTransform>();
-  bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one; bgRT.sizeDelta = Vector2.zero;
-  bgGO.GetComponent<Image>().color = new Color(0.012f, 0.018f, 0.035f, 1f);
+  // Painel translúcido lateral esquerdo (apenas sob a UI, deixando a vitrine do carro 100% livre à direita)
+  var leftPanelGO = new GameObject("Left UI Backdrop", typeof(RectTransform), typeof(Image));
+  leftPanelGO.transform.SetParent(canvasGO.transform, false);
+  var lpRT = leftPanelGO.GetComponent<RectTransform>();
+  lpRT.anchorMin = new Vector2(0f, 0f);
+  lpRT.anchorMax = new Vector2(0.48f, 1f);
+  lpRT.sizeDelta = Vector2.zero;
+  leftPanelGO.GetComponent<Image>().color = new Color(0.010f, 0.015f, 0.026f, 0.70f);
 
   Color cyan = new Color(0.1f, 0.9f, 1f);
   Color pink = new Color(1f, 0.12f, 0.4f);
-  Color cardBg = new Color(0.025f, 0.05f, 0.09f, 0.92f);
+  Color cardBg = new Color(0.022f, 0.045f, 0.085f, 0.90f);
   Color textWhite = new Color(0.96f, 0.98f, 1f);
   Color textDim = new Color(0.55f, 0.65f, 0.78f);
 
   // ==========================================
-  // TITLE HEADER
+  // TITLE HEADER (Canto Superior Esquerdo)
   // ==========================================
   var titleGO = new GameObject("Title", typeof(RectTransform), typeof(TextMeshProUGUI));
   titleGO.transform.SetParent(canvasGO.transform, false);
   var rt = titleGO.GetComponent<RectTransform>();
-  rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.88f);
-  rt.sizeDelta = new Vector2(900, 110);
+  rt.anchorMin = rt.anchorMax = new Vector2(0.24f, 0.91f);
+  rt.sizeDelta = new Vector2(650, 75);
   var tTitle = titleGO.GetComponent<TextMeshProUGUI>();
   tTitle.text = "NEON COAST";
   tTitle.font = Font();
-  tTitle.fontSize = 86;
+  tTitle.fontSize = 62;
   tTitle.fontStyle = FontStyles.Bold;
   tTitle.color = cyan;
   tTitle.alignment = TextAlignmentOptions.Center;
@@ -101,44 +105,44 @@ public static class MainMenuBuilder {
   var lineGO = new GameObject("Neon Line", typeof(RectTransform), typeof(Image));
   lineGO.transform.SetParent(canvasGO.transform, false);
   rt = lineGO.GetComponent<RectTransform>();
-  rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.825f);
-  rt.sizeDelta = new Vector2(580, 4);
+  rt.anchorMin = rt.anchorMax = new Vector2(0.24f, 0.852f);
+  rt.sizeDelta = new Vector2(420, 3);
   lineGO.GetComponent<Image>().color = cyan;
 
   var subGO = new GameObject("Subtitle", typeof(RectTransform), typeof(TextMeshProUGUI));
   subGO.transform.SetParent(canvasGO.transform, false);
   rt = subGO.GetComponent<RectTransform>();
-  rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.785f);
-  rt.sizeDelta = new Vector2(600, 40);
+  rt.anchorMin = rt.anchorMax = new Vector2(0.24f, 0.822f);
+  rt.sizeDelta = new Vector2(450, 30);
   var tSub = subGO.GetComponent<TextMeshProUGUI>();
   tSub.text = "R  A  C  I  N  G";
   tSub.font = Font();
-  tSub.fontSize = 28;
+  tSub.fontSize = 20;
   tSub.color = textWhite;
   tSub.alignment = TextAlignmentOptions.Center;
 
   // ==========================================
-  // VEHICLE SELECTION CARD (Left Center)
+  // VEHICLE SELECTION CARD (Lado Esquerdo Superior)
   // ==========================================
-  var carCard = Card(canvasGO.transform, "Vehicle Card", new Vector2(0.5f, 0.5f), new Vector2(-220, -20), new Vector2(540, 410), cardBg, cyan);
+  var carCard = Card(canvasGO.transform, "Vehicle Card", new Vector2(0.24f, 0.53f), Vector2.zero, new Vector2(530, 410), cardBg, cyan);
 
-  var cardHeader = Label(carCard.transform, "Card Header", new Vector2(0.5f, 1), new Vector2(0, -18), new Vector2(500, 24), 16, cyan, TextAlignmentOptions.Center);
+  var cardHeader = Label(carCard.transform, "Card Header", new Vector2(0.5f, 1), new Vector2(0, -18), new Vector2(490, 24), 16, cyan, TextAlignmentOptions.Center);
   cardHeader.text = "SELECIONE O VEÍCULO";
   cardHeader.fontStyle = FontStyles.Bold;
 
   // Vehicle Switcher Row ( [ < ]  ASTER GT  [ > ] )
-  var prevBtn = CreateButton(carCard.transform, "Prev Car Btn", "<", new Vector2(0.12f, 0.81f), new Vector2(46, 46), new Color(0.08f, 0.18f, 0.3f, 0.8f), cyan, 28);
+  var prevBtn = CreateButton(carCard.transform, "Prev Car Btn", "<", new Vector2(0.11f, 0.82f), new Vector2(46, 46), new Color(0.08f, 0.18f, 0.3f, 0.8f), cyan, 28);
   UnityEventTools.AddPersistentListener(prevBtn.GetComponent<Button>().onClick, menu.PrevVehicle);
 
-  var nextBtn = CreateButton(carCard.transform, "Next Car Btn", ">", new Vector2(0.88f, 0.81f), new Vector2(46, 46), new Color(0.08f, 0.18f, 0.3f, 0.8f), cyan, 28);
+  var nextBtn = CreateButton(carCard.transform, "Next Car Btn", ">", new Vector2(0.89f, 0.82f), new Vector2(46, 46), new Color(0.08f, 0.18f, 0.3f, 0.8f), cyan, 28);
   UnityEventTools.AddPersistentListener(nextBtn.GetComponent<Button>().onClick, menu.NextVehicle);
 
-  menu.carNameText = Label(carCard.transform, "Car Name", new Vector2(0.5f, 0.81f), Vector2.zero, new Vector2(340, 46), 34, textWhite, TextAlignmentOptions.Center);
+  menu.carNameText = Label(carCard.transform, "Car Name", new Vector2(0.5f, 0.82f), Vector2.zero, new Vector2(330, 46), 32, textWhite, TextAlignmentOptions.Center);
   menu.carNameText.fontStyle = FontStyles.Bold;
 
-  menu.carTaglineText = Label(carCard.transform, "Car Tagline", new Vector2(0.5f, 0.70f), Vector2.zero, new Vector2(480, 26), 16, cyan, TextAlignmentOptions.Center);
+  menu.carTaglineText = Label(carCard.transform, "Car Tagline", new Vector2(0.5f, 0.70f), Vector2.zero, new Vector2(480, 26), 15, cyan, TextAlignmentOptions.Center);
 
-  // Stats Block (Em Português)
+  // Stats Block
   string[] statNames = { "VELOCIDADE", "ACELERAÇÃO", "DIRIGIBILIDADE", "NITRO REGEN" };
   TMP_Text[] statTexts = new TMP_Text[4];
   for (int i = 0; i < 4; i++) {
@@ -156,7 +160,7 @@ public static class MainMenuBuilder {
   menu.nitroStatText = statTexts[3];
 
   // Paint Swatches Row
-  var paintLbl = Label(carCard.transform, "Paint Label", new Vector2(0.5f, 0.18f), Vector2.zero, new Vector2(480, 22), 15, textDim, TextAlignmentOptions.Center);
+  var paintLbl = Label(carCard.transform, "Paint Label", new Vector2(0.5f, 0.19f), Vector2.zero, new Vector2(480, 22), 15, textDim, TextAlignmentOptions.Center);
   paintLbl.text = "ESCOLHA A COR";
   paintLbl.fontStyle = FontStyles.Bold;
 
@@ -169,13 +173,12 @@ public static class MainMenuBuilder {
   };
 
   for (int i = 0; i < 4; i++) {
-   int pIndex = i;
    float x = 0.24f + i * 0.17f;
    var swatchGO = new GameObject("Paint_" + i, typeof(RectTransform), typeof(Image), typeof(Button));
    swatchGO.transform.SetParent(carCard.transform, false);
    var srt = swatchGO.GetComponent<RectTransform>();
    srt.anchorMin = srt.anchorMax = new Vector2(x, 0.09f);
-   srt.sizeDelta = new Vector2(60, 32);
+   srt.sizeDelta = new Vector2(62, 34);
    swatchGO.GetComponent<Image>().color = paintColors[i];
 
    var borderGO = new GameObject("SelectedBorder", typeof(RectTransform), typeof(Image));
@@ -186,33 +189,26 @@ public static class MainMenuBuilder {
    borderGO.SetActive(i == 0);
 
    menu.paintIndicators[i] = swatchGO.GetComponent<Image>();
-
-   var sBtn = swatchGO.GetComponent<Button>();
-   sBtn.onClick.AddListener(() => menu.SelectPaint(pIndex));
   }
 
   // ==========================================
-  // ACTIONS COLUMN (Right Center)
+  // ACTIONS ROW / CARD (Lado Esquerdo Inferior)
   // ==========================================
-  var actionsCard = Card(canvasGO.transform, "Actions Card", new Vector2(0.5f, 0.5f), new Vector2(280, -20), new Vector2(360, 410), cardBg, pink);
+  var actionsCard = Card(canvasGO.transform, "Actions Card", new Vector2(0.24f, 0.19f), Vector2.zero, new Vector2(530, 160), cardBg, pink);
 
-  var actHeader = Label(actionsCard.transform, "Action Header", new Vector2(0.5f, 1), new Vector2(0, -18), new Vector2(320, 24), 16, pink, TextAlignmentOptions.Center);
+  var actHeader = Label(actionsCard.transform, "Action Header", new Vector2(0.5f, 1), new Vector2(0, -14), new Vector2(480, 22), 15, pink, TextAlignmentOptions.Center);
   actHeader.text = "MODO DE JOGO";
   actHeader.fontStyle = FontStyles.Bold;
 
-  // Botão Corrida
-  var btn1 = CreateButton(actionsCard.transform, "Start Button", "CORRIDA", new Vector2(0.5f, 0.72f), new Vector2(300, 70), new Color(0.1f, 0.9f, 1f, 0.25f), cyan, 34);
+  var btn1 = CreateButton(actionsCard.transform, "Start Button", "CORRIDA", new Vector2(0.22f, 0.40f), new Vector2(150, 56), new Color(0.1f, 0.9f, 1f, 0.25f), cyan, 24);
   UnityEventTools.AddPersistentListener(btn1.GetComponent<Button>().onClick, menu.StartRace);
 
-  // Botão Contra o Tempo
-  var btnTT = CreateButton(actionsCard.transform, "Time Trial Button", "CONTRA O TEMPO", new Vector2(0.5f, 0.48f), new Vector2(300, 70), new Color(1f, 0.12f, 0.4f, 0.22f), pink, 28);
+  var btnTT = CreateButton(actionsCard.transform, "Time Trial Button", "CONTRA O TEMPO", new Vector2(0.54f, 0.40f), new Vector2(160, 56), new Color(1f, 0.12f, 0.4f, 0.22f), pink, 18);
   UnityEventTools.AddPersistentListener(btnTT.GetComponent<Button>().onClick, menu.StartTimeTrial);
 
-  // Botão Sair
-  var btn2 = CreateButton(actionsCard.transform, "Quit Button", "SAIR DO JOGO", new Vector2(0.5f, 0.24f), new Vector2(300, 55), new Color(0.12f, 0.15f, 0.2f, 0.6f), new Color(1f, 0.3f, 0.4f), 24);
+  var btn2 = CreateButton(actionsCard.transform, "Quit Button", "SAIR", new Vector2(0.85f, 0.40f), new Vector2(110, 56), new Color(0.12f, 0.15f, 0.2f, 0.6f), new Color(1f, 0.3f, 0.4f), 20);
   UnityEventTools.AddPersistentListener(btn2.GetComponent<Button>().onClick, menu.QuitGame);
 
-  // Vincula botões de ação ao MainMenu para navegação direcional
   menu.actionButtonBgs = new Image[] {
    btn1.GetComponent<Image>(),
    btnTT.GetComponent<Image>(),
@@ -227,10 +223,11 @@ public static class MainMenuBuilder {
   // ==========================================
   // BOTTOM CONTROLS HINT
   // ==========================================
-  var hintPill = Card(canvasGO.transform, "Hint Card", new Vector2(0.5f, 0.05f), Vector2.zero, new Vector2(1000, 44), new Color(0.02f, 0.04f, 0.08f, 0.88f), cyan);
-  var hTxt = Label(hintPill.transform, "Hint Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(980, 36), 16, textWhite, TextAlignmentOptions.Center);
+  var hintPill = Card(canvasGO.transform, "Hint Card", new Vector2(0.5f, 0.045f), Vector2.zero, new Vector2(1000, 40), new Color(0.02f, 0.04f, 0.08f, 0.88f), cyan);
+  var hTxt = Label(hintPill.transform, "Hint Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(980, 32), 15, textWhite, TextAlignmentOptions.Center);
   hTxt.text = "<b>↑ / ↓</b> Modo   •   <b>← / →</b> Veículo   •   <b>C / 1-4</b> Cor   •   <b>ENTER</b> Iniciar   •   <b>ESC</b> Sair";
 
+  // EventSystem
   var esGO = new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
   var module = esGO.GetComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
   module.actionsAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.InputSystem.InputActionAsset>("Assets/InputSystem_Actions.inputactions");
@@ -245,7 +242,7 @@ public static class MainMenuBuilder {
   EditorBuildSettings.scenes = newScenes.ToArray();
 
   AssetDatabase.SaveAssets();
-  Debug.Log("Neon Coast Racing: Main Menu scene rebuilt with Vehicle Selection Showcase in Portuguese!");
+  Debug.Log("[MainMenuBuilder] Main Menu scene successfully built with 3D Showcase setup!");
  }
 
  static GameObject Card(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, Color bgColor, Color borderColor) {
@@ -258,7 +255,6 @@ public static class MainMenuBuilder {
   rt.sizeDelta = size;
   card.GetComponent<Image>().color = bgColor;
 
-  // Neon accent line
   var line = new GameObject("Accent Line", typeof(RectTransform), typeof(Image));
   line.transform.SetParent(card.transform, false);
   var lrt = line.GetComponent<RectTransform>();

@@ -1,3 +1,23 @@
+## [Unreleased]
+
+- Correções visuais (20/09/2026): carro de vitrine cinemático e sem gravidade; plataforma com anel vazado e refletor apontado para o carro.
+- Cidade: pivôs de escala unitária impedem que janelas, telhados e outdoors herdem dimensões gigantes dos prédios. Migração idempotente dos objetos antigos ao abrir a cena NeonCoast; alterações pendentes não são salvas automaticamente.
+- Aerofólios: eliminadas faces invertidas sobre os mesmos vértices que anulavam as normais; carbono com reflexão mais suave.
+- Validação destas correções (20/09/2026): Editor conectado pelo Unity CLI; carro de vitrine estável por 24 segundos; cidade migrada e salva; cinco malhas de aerofólios/winglets sem normais inválidas; console sem erros no teste. Build Windows concluído com zero erros (avisos de shaders Sentis e configuração opcional do Pipeline). Executável inspecionado visualmente sem faixas gigantes ou clarão no aerofólio; teste de luz de posição/freio aprovado.
+
+- Correção validada no standalone: shader próprio para lanternas vermelhas, incluído via Resources, sem reflexão branca. Build 19/09/2026 22:56 sem erros; teste automático de luz de posição/freio aprovado e capturas do executável inspecionadas.
+
+### Corrigido
+- Público: pivôs sem herança de escala, membros arredondados, cabelo e calçados; roupas sem emissão neon.
+- Público limitado a trechos baixos, deslocamento reduzido e animação distante suspensa.
+- Reações do público acompanham o jogador correto, em vez do primeiro veículo encontrado.
+- Lanternas: contraste entre posição e freio, freio visível durante a largada e materiais do trânsito sem duplicação na lista de atualização.
+
+### Validação
+- Build Windows gerado em 19/09/2026 às 22:48 (horário local), zero erros, 145852609 bytes. Pessoas e lanternas inspecionadas no Editor; execução do novo standalone ainda não testada.
+- Terceira luz de freio separada; lente vermelho-rubi e menor reflexão branca.
+- Busca global de carros a cada quadro substituída por registro de veículos ativos.
+
 # Changelog
 
 Todas as alterações notáveis deste projeto serão documentadas neste arquivo.

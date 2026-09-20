@@ -14,9 +14,9 @@ public static class NCRBuildScript {
   Debug.Log("[NCRBuildScript] Ensuring output directory exists: " + outputDir);
   Directory.CreateDirectory(outputDir);
 
-  // 1. Regenera a cena NeonCoast com o novo HUD (sem sobreposição) e Pause Menu com navegação direcional
+  // 1. Regenera a cena NeonCoast com o novo HUD, Pause Menu, público realista e cidade aprimorada
   try {
-   Debug.Log("[NCRBuildScript] Rebuilding NeonCoast scene HUD and UI...");
+   Debug.Log("[NCRBuildScript] Rebuilding NeonCoast scene HUD, UI and City...");
    EditorSceneManager.OpenScene("Assets/Scenes/NeonCoast.unity");
    HUDOverhaul.RebuildHUD();
    GameUIBuilder.Build();
@@ -58,15 +58,18 @@ public static class NCRBuildScript {
    spectators.SpawnAllSpectators();
    EditorUtility.SetDirty(spectators.gameObject);
 
+   // Aprimora a cidade, skyline, pórticos e calçadão
+   NeonCoast.CityEnhancement.Apply();
+
    EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
    EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
   } catch (System.Exception e) {
    Debug.LogWarning("[NCRBuildScript] Note on NeonCoast UI rebuild: " + e.Message);
   }
 
-  // 2. Regenera o Menu Principal em português com suporte a navegação direcional
+  // 2. Regenera o Menu Principal em português com suporte à vitrine 3D e navegação direcional
   try {
-   Debug.Log("[NCRBuildScript] Rebuilding MainMenu scene in Portuguese...");
+   Debug.Log("[NCRBuildScript] Rebuilding MainMenu scene with 3D showcase...");
    MainMenuBuilder.Build();
   } catch (System.Exception e) {
    Debug.LogWarning("[NCRBuildScript] Note on MainMenu rebuild: " + e.Message);

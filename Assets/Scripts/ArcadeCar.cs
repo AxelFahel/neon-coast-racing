@@ -22,34 +22,38 @@ public class ArcadeCar : MonoBehaviour {
  public string vehicleName = "ASTER GT";
  public bool Slipstreaming { get; set; }
 
+ static readonly System.Collections.Generic.HashSet<ArcadeCar> activeCars = new System.Collections.Generic.HashSet<ArcadeCar>();
+ Renderer centerStopLamp;
+ Light tailGlow;
+ void OnEnable() { activeCars.Add(this); }
+
  Rigidbody rb;
  float throttle, steer, smoothedSteer;
  bool handbrake, boost;
  Vector3 spawn; Quaternion spawnRotation;
  readonly System.Collections.Generic.List<Material> tailLightMats = new System.Collections.Generic.List<Material>();
  Material playerPaint;
- Color tailNormal  = new Color(0.85f, 0.02f, 0.04f);
- Color tailBraking = new Color(1.00f, 0.04f, 0.06f);
 
- // ── Physics constants ─────────────────────────────────────────────────────
+ // ── Physics constants calibradas para pilotagem esportiva arcade ───────────
  const float RbMass           = 1350f;
- const float DownforceMult    = 0.8f;
- const float DragMult          = 0.32f;
- const float MotorTorqueBase   = 1350f;
- const float MotorTorqueBoost  = 2000f;
- const float BrakeTorque       = 3200f;
- const float HandbrakeTorque   = 2200f;
- const float IdleBrakeTorque   = 55f;
- const float SidewaysFriction  = 1.6f;
- const float SteerSmoothing    = 2.8f;
- const float BodyTiltSpeed     = 5f;
+ const float DownforceMult    = 1.35f;  // Downforce alto = estabilidade em alta velocidade
+ const float DragMult         = 0.30f;
+ const float MotorTorqueBase  = 1400f;
+ const float MotorTorqueBoost = 2100f;
+ const float BrakeTorque      = 3500f;
+ const float HandbrakeTorque  = 2400f;
+ const float IdleBrakeTorque  = 55f;
+ const float SidewaysFriction = 2.6f;   // Alta aderência lateral padrão
+ const float ForwardFriction  = 1.9f;   // Alta tração longitudinal
+ const float SteerSmoothing   = 4.5f;   // Resposta de volante ágil e suave
+ const float BodyTiltSpeed    = 5.5f;
 
  public void SetSpawn(Vector3 p, Quaternion q) { spawn = p; spawnRotation = q; }
 
  void Awake() {
   rb = GetComponent<Rigidbody>();
   rb.mass = RbMass;
-  rb.centerOfMass = new Vector3(0, .15f, 0);
+  rb.centerOfMass = new Vector3(0, 0.08f, 0); // Centro de gravidade baixo = não capota e não desliza
   rb.interpolation = RigidbodyInterpolation.Interpolate;
   rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
   spawn = transform.position;
@@ -62,9 +66,38 @@ public class ArcadeCar : MonoBehaviour {
   if (!automation) ApplyVehicleSpecs();
   else if (GetComponent<GridRacer>() != null) ApplyRivalSpecs();
   else ApplyTrafficSpecs();
+
+  foreach (var renderer in GetComponentsInChildren<Renderer>(true))
+   if (renderer.name == "Center stop lamp") centerStopLamp = renderer;
+  foreach (var light in GetComponentsInChildren<Light>(true))
+   if (light.name == "Car_TailGlow") tailGlow = light;
+
+  ApplyWheelFriction();
  }
 
- void ApplyVehicleSpecs() {
+ void ApplyWheelFriction() {
+  if (wheels == null || wheels.Length == 0) return;
+  foreach (var w in wheels) {
+   if (!w) continue;
+   var sf = w.sidewaysFriction;
+   sf.extremumSlip   = 0.16f;
+   sf.extremumValue  = 1.0f;
+   sf.asymptoteSlip  = 0.32f;
+   sf.asymptoteValue = 0.85f;
+   sf.stiffness      = SidewaysFriction;
+   w.sidewaysFriction = sf;
+
+   var ff = w.forwardFriction;
+   ff.extremumSlip   = 0.11f;
+   ff.extremumValue  = 1.0f;
+   ff.asymptoteSlip  = 0.26f;
+   ff.asymptoteValue = 0.80f;
+   ff.stiffness      = ForwardFriction;
+   w.forwardFriction = ff;
+  }
+ }
+
+ public void ApplyVehicleSpecs() {
   var v = VehicleRegistry.GetSelectedVehicle();
   var p = VehicleRegistry.GetSelectedPaint();
   vehicleName    = v.name;
@@ -75,10 +108,10 @@ public class ArcadeCar : MonoBehaviour {
   driftNitroMult = v.driftNitroMult;
   handbrakeGrip  = v.handbrakeGrip;
 
-  // Reconstrói a carroceria esculpida, aerodinâmica e estilosa do supercarro
+  // Reconstrói a carroceria exclusiva do modelo escolhido com a pintura selecionada
   CarVisualsOverhaul.RebuildCarVisuals(this, v, p);
 
-  // Localiza materiais de lanterna para modulação dinâmica de freio (apenas a barra LED)
+  // Localiza materiais de lanterna para modulação de freio
   tailLightMats.Clear();
   foreach (var mr in GetComponentsInChildren<MeshRenderer>(true)) {
    if (mr.name == "Tail light bar") {
@@ -90,26 +123,29 @@ public class ArcadeCar : MonoBehaviour {
    }
   }
 
-  // Limpeza rigorosa de luzes pontuais que causavam clarão/ofuscamento da câmera
   CleanExcessiveLights();
 
-  // Faróis focados para frente na pista (spots direcionais, sem ofuscamento omnidirecional)
+  // Faróis direcionais para a pista
   if (transform.Find("Car_Headlight_L") == null) {
    CreateHeadlight("Car_Headlight_L", new Vector3(-0.68f, 0.68f, 2.18f));
    CreateHeadlight("Car_Headlight_R", new Vector3( 0.68f, 0.68f, 2.18f));
   }
 
-  // Luz neon de chassi suave (Underglow sutil no asfalto)
-  if (transform.Find("Car_Underglow") == null) {
+  // Neon de chassi (Underglow na cor da pintura selecionada)
+  var underglow = transform.Find("Car_Underglow");
+  if (!underglow) {
    var underglowGO = new GameObject("Car_Underglow");
    underglowGO.transform.SetParent(transform, false);
    underglowGO.transform.localPosition = new Vector3(0, 0.15f, 0);
    var underLight = underglowGO.AddComponent<Light>();
    underLight.type = LightType.Point;
-   underLight.range = 3.2f;
-   underLight.intensity = 0.5f;
+   underLight.range = 3.6f;
+   underLight.intensity = 0.85f;
    underLight.color = p.color;
    underLight.shadows = LightShadows.None;
+  } else {
+   var underLight = underglow.GetComponent<Light>();
+   if (underLight) underLight.color = p.color;
   }
  }
 
@@ -120,13 +156,13 @@ public class ArcadeCar : MonoBehaviour {
   string vehId = "aster_gt";
 
   if (rName.Contains("KAI")) {
-   rivalColor = new Color(0.98f, 0.32f, 0.05f); // Neon Coral / Laranja Hyper
+   rivalColor = new Color(0.98f, 0.32f, 0.05f); // Laranja Neon Drift
    vehId = "shinobi_rspec";
   } else if (rName.Contains("NOVA")) {
-   rivalColor = new Color(0.72f, 0.12f, 0.98f); // Violeta / Roxo Cyberpunk
+   rivalColor = new Color(0.72f, 0.12f, 0.98f); // Violeta Hyper
    vehId = "valkyrie_apex";
   } else {
-   rivalColor = new Color(0.04f, 0.92f, 0.62f); // Verde Esmeralda / Ciano Elétrico
+   rivalColor = new Color(0.04f, 0.92f, 0.62f); // Esmeralda Ciano
    vehId = "aster_gt";
   }
 
@@ -144,7 +180,6 @@ public class ArcadeCar : MonoBehaviour {
 
   CarVisualsOverhaul.RebuildCarVisuals(this, vData, pData);
 
-  // Localiza materiais de lanterna para modulação dinâmica de freio dos rivais
   tailLightMats.Clear();
   foreach (var mr in GetComponentsInChildren<MeshRenderer>(true)) {
    if (mr.name == "Tail light bar") {
@@ -156,24 +191,21 @@ public class ArcadeCar : MonoBehaviour {
    }
   }
 
-  // Limpeza rigorosa de luzes pontuais
   CleanExcessiveLights();
 
-  // Faróis potentes dianteiros
   if (transform.Find("Car_Headlight_L") == null) {
    CreateHeadlight("Car_Headlight_L", new Vector3(-0.68f, 0.68f, 2.18f));
    CreateHeadlight("Car_Headlight_R", new Vector3( 0.68f, 0.68f, 2.18f));
   }
 
-  // Luz neon sob o chassi (Underglow suave na cor do oponente)
   if (transform.Find("Car_Underglow") == null) {
    var underglowGO = new GameObject("Car_Underglow");
    underglowGO.transform.SetParent(transform, false);
    underglowGO.transform.localPosition = new Vector3(0, 0.15f, 0);
    var underLight = underglowGO.AddComponent<Light>();
    underLight.type = LightType.Point;
-   underLight.range = 3.0f;
-   underLight.intensity = 0.5f;
+   underLight.range = 3.2f;
+   underLight.intensity = 0.7f;
    underLight.color = rivalColor;
    underLight.shadows = LightShadows.None;
   }
@@ -183,10 +215,10 @@ public class ArcadeCar : MonoBehaviour {
   CleanExcessiveLights();
   tailLightMats.Clear();
 
-  // Substitui os cubos antigos de lanterna por material LED vermelho escuro/saturado sem clarão branco
   var litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-  var trafficTailMat = new Material(litShader);
+  var trafficTailMat = new Material(Resources.Load<Shader>("VehicleRearLamp"));
   trafficTailMat.name = "TrafficTailLED";
+  trafficTailMat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
   Color red = new Color(0.85f, 0.02f, 0.04f);
   trafficTailMat.SetColor("_BaseColor", red);
   if (trafficTailMat.HasProperty("_EmissionColor")) {
@@ -196,11 +228,10 @@ public class ArcadeCar : MonoBehaviour {
   foreach (var mr in GetComponentsInChildren<MeshRenderer>(true)) {
    if (mr.name.Contains("Tail") || mr.name.Contains("tail")) {
     mr.material = trafficTailMat;
-    tailLightMats.Add(trafficTailMat);
+    if (!tailLightMats.Contains(trafficTailMat)) tailLightMats.Add(trafficTailMat);
    }
   }
 
-  // Faróis dianteiros focados para o tráfego civil
   if (transform.Find("Car_Headlight_L") == null) {
    CreateHeadlight("Car_Headlight_L", new Vector3(-0.6f, 0.65f, 2.0f));
    CreateHeadlight("Car_Headlight_R", new Vector3( 0.6f, 0.65f, 2.0f));
@@ -208,32 +239,35 @@ public class ArcadeCar : MonoBehaviour {
  }
 
  public void CleanExcessiveLights() {
-  // Destrói qualquer luz da cena antiga ou rogue que cause clarão branco ofuscante
   var lights = GetComponentsInChildren<Light>(true);
   var toDestroy = new System.Collections.Generic.List<GameObject>();
   foreach (var l in lights) {
    if (!l) continue;
-   // Preserva apenas as luzes oficiais do carro
    if (l.name != "Car_Headlight_L" && l.name != "Car_Headlight_R"
        && l.name != "Car_Underglow" && l.name != "Car_TailGlow") {
     toDestroy.Add(l.gameObject);
    }
   }
   foreach (var g in toDestroy) {
-   if (g != null && g != gameObject) Destroy(g);
+   if (g != null && g != gameObject) {
+    if (Application.isPlaying) { g.SetActive(false); Destroy(g); }
+    else DestroyImmediate(g);
+   }
   }
 
-  // Purga GameObjects residuais específicos
   foreach (var n in new string[] { "Paint rim light", "Projector headlight", "Car_TailLight_L", "Car_TailLight_R", "Car_RoofFill" }) {
    var t = transform.Find(n);
-   if (t) Destroy(t.gameObject);
+   if (t) {
+    if (Application.isPlaying) { t.gameObject.SetActive(false); Destroy(t.gameObject); }
+    else DestroyImmediate(t.gameObject);
+   }
   }
 
-  // Remove cubos antigos "Tail light" e "Headlight" se o novo modelo estilizado estiver ativo
   if (transform.Find("Aster GT Coachwork/Tail light bar") != null || GetComponent<GridRacer>() != null || !automation) {
    foreach (var t in GetComponentsInChildren<Transform>(true)) {
     if (t && t != transform && (t.name == "Tail light" || t.name == "Headlight")) {
-     Destroy(t.gameObject);
+     if (Application.isPlaying) { t.gameObject.SetActive(false); Destroy(t.gameObject); }
+     else DestroyImmediate(t.gameObject);
     }
    }
   }
@@ -255,10 +289,10 @@ public class ArcadeCar : MonoBehaviour {
   var l = hlGO.AddComponent<Light>();
   l.type = LightType.Spot;
   l.range = 55f;
-  l.spotAngle = 42f;        // Cone mais fechado = feixe mais definido na pista
+  l.spotAngle = 42f;
   l.innerSpotAngle = 18f;
-  l.intensity = 3.5f;       // Iluminação real na pista sem bloom excessivo
-  l.color = new Color(0.90f, 0.95f, 1.0f);  // Branco levemente frio (xenônio/LED)
+  l.intensity = 3.5f;
+  l.color = new Color(0.90f, 0.95f, 1.0f);
   l.shadows = LightShadows.None;
  }
 
@@ -271,11 +305,10 @@ public class ArcadeCar : MonoBehaviour {
 
   if (transform.position.y < -12) ResetCar();
 
-  // Sync wheel visuals — guard against inspector mis-configuration
   if (wheels != null && wheelVisuals != null) {
    int count = Mathf.Min(wheels.Length, wheelVisuals.Length);
    for (int i = 0; i < count; i++) {
-    if (wheelVisuals[i] == null) continue;
+    if (wheelVisuals[i] == null || wheels[i] == null) continue;
     wheels[i].GetWorldPose(out Vector3 pos, out Quaternion q);
     wheelVisuals[i].SetPositionAndRotation(pos, q);
    }
@@ -287,38 +320,31 @@ public class ArcadeCar : MonoBehaviour {
     Quaternion.Euler(throttle * -1.1f, 0, -smoothedSteer * Mathf.Clamp(SpeedKmh / 45f, 0, 2)),
     Time.deltaTime * BodyTiltSpeed);
 
-   // Dynamic brake lights — modula emissão de LED e luz de glow no asfalto
-   {
-    bool isBraking = (throttle * ForwardSpeed < -1.2f) || handbrake;
-    Color pureRed = new Color(0.95f, 0.02f, 0.04f, 1f);
-    // Emissão em HDR para bloom neon: normal = 1.9 (vermelho vivo), freio = 4.2 (LED hiper-brilhante)
-    Color normalEmission  = new Color(1.9f, 0.02f, 0.03f);
-    Color brakingEmission = new Color(4.2f, 0.03f, 0.05f);
-    Color targetEmission  = isBraking ? brakingEmission : normalEmission;
+  // Dynamic brake lights
+  {
+   bool isBraking = !controlsEnabled || handbrake || (Mathf.Abs(ForwardSpeed) > .35f && throttle * ForwardSpeed < -.15f);
+   Color pureRed = new Color(0.95f, 0.02f, 0.04f, 1f);
+   Color normalEmission  = new Color(.65f, .003f, .006f);
+   Color brakingEmission = new Color(3.2f, .008f, .015f);
+   Color targetEmission  = isBraking ? brakingEmission : normalEmission;
 
-    foreach (var mat in tailLightMats) {
-     if (!mat) continue;
-     // BaseColor NUNCA ultrapassa 1.0 para nunca desbotar ou ficar branco
-     if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", pureRed);
-     if (mat.HasProperty("_Color")) mat.SetColor("_Color", pureRed);
-     if (mat.HasProperty("_EmissionColor")) {
-      mat.SetColor("_EmissionColor", Color.Lerp(mat.GetColor("_EmissionColor"), targetEmission, Time.deltaTime * 16f));
-     }
-    }
-
-    // Modula a intensidade da luz pontual de glow traseiro no asfalto
-    var tailGlowT = bodyVisual ? bodyVisual.Find("Car_TailGlow") : transform.Find("Car_TailGlow");
-    if (tailGlowT) {
-     var tgl = tailGlowT.GetComponent<Light>();
-     if (tgl) tgl.intensity = Mathf.Lerp(tgl.intensity, isBraking ? 3.0f : 1.2f, Time.deltaTime * 16f);
+   foreach (var mat in tailLightMats) {
+    if (!mat) continue;
+    if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", pureRed);
+    if (mat.HasProperty("_Color")) mat.SetColor("_Color", pureRed);
+    if (mat.HasProperty("_EmissionColor")) {
+     mat.SetColor("_EmissionColor", Color.Lerp(mat.GetColor("_EmissionColor"), targetEmission, Time.deltaTime * 16f));
     }
    }
 
-  // Vácuo aerodinâmico (Slipstream / Drafting) atrás de outros carros
+   if (centerStopLamp) centerStopLamp.enabled = isBraking;
+   if (tailGlow) tailGlow.intensity = Mathf.Lerp(tailGlow.intensity, isBraking ? 1.5f : .25f, Time.deltaTime * 16f);
+  }
+
+  // Slipstream
   Slipstreaming = false;
   if (ForwardSpeed > 18f) {
-   var allCars = FindObjectsByType<ArcadeCar>(FindObjectsSortMode.None);
-   foreach (var c in allCars) {
+   foreach (var c in activeCars) {
     if (!c || c == this) continue;
     Vector3 localOther = transform.InverseTransformPoint(c.transform.position);
     if (localOther.z > 3.5f && localOther.z < 22f && Mathf.Abs(localOther.x) < 2.3f && Mathf.Abs(localOther.y) < 2.0f) {
@@ -330,9 +356,10 @@ public class ArcadeCar : MonoBehaviour {
  }
 
  void FixedUpdate() {
+  if (wheels == null || wheels.Length == 0) return;
+
   if (!controlsEnabled) {
-   // Kill drive and hold brakes on all four wheels
-   foreach (var w in wheels) { w.motorTorque = 0; w.brakeTorque = BrakeTorque; }
+   foreach (var w in wheels) { if (w) { w.motorTorque = 0; w.brakeTorque = BrakeTorque; } }
    return;
   }
 
@@ -342,7 +369,7 @@ public class ArcadeCar : MonoBehaviour {
                     Mathf.Clamp01(Mathf.Abs(speed) / topSpeed));
 
   bool grounded = false;
-  foreach (var w in wheels) grounded |= w.isGrounded;
+  foreach (var w in wheels) if (w) grounded |= w.isGrounded;
 
   Boosting = boost && throttle > 0 && speed > 4 && Nitro > .01f && grounded;
   Drifting = handbrake && Mathf.Abs(speed) > 7 && grounded;
@@ -357,11 +384,12 @@ public class ArcadeCar : MonoBehaviour {
                      * torqueMult * Mathf.Clamp01(1f - Mathf.Abs(speed) / speedCap);
 
   for (int i = 0; i < wheels.Length; i++) {
-   var  w       = wheels[i];
+   var  w = wheels[i];
+   if (!w) continue;
    bool isFront = i < 2;
 
    w.steerAngle  = isFront ? steerDeg : 0;
-   w.motorTorque = isFront ? 0 : torque;  // rear-wheel drive
+   w.motorTorque = isFront ? 0 : torque;
 
    if (braking)
     w.brakeTorque = BrakeTorque;
@@ -372,14 +400,29 @@ public class ArcadeCar : MonoBehaviour {
    else
     w.brakeTorque = 0;
 
+   // Aderência lateral: solta as rodas traseiras para drift quando freio de mão está acionado
    var f = w.sidewaysFriction;
-   f.stiffness = handbrake && !isFront ? handbrakeGrip : SidewaysFriction;
+   float targetStiff = (handbrake && !isFront) ? handbrakeGrip : SidewaysFriction;
+   f.stiffness = Mathf.MoveTowards(f.stiffness, targetStiff, Time.fixedDeltaTime * 10f);
    w.sidewaysFriction = f;
   }
 
   if (grounded) {
    rb.AddForce(-transform.up * rb.linearVelocity.sqrMagnitude * DownforceMult);
    rb.AddForce(-rb.linearVelocity * rb.linearVelocity.magnitude * DragMult);
+
+   // ── Assistência de Aderência Lateral (Rock-Solid Grip) ─────────────
+   // Mantém o carro firme e guiado nas curvas normais, sem escorregar como sabão.
+   // Quando o freio de mão é acionado, permite derrapagem com total controle.
+   if (Mathf.Abs(speed) > 1.8f) {
+    Vector3 rightVec = transform.right;
+    float latVel = Vector3.Dot(rb.linearVelocity, rightVec);
+    // Em curva normal: cancela 88% do deslize lateral -> carro colado no traçado
+    // No drift de freio de mão: reduz cancelamento para 28% -> drift fluído e previsível
+    float cancelRate = handbrake ? (1f - handbrakeGrip) : 0.88f;
+    Vector3 correction = -rightVec * latVel * cancelRate;
+    rb.AddForce(correction * Mathf.Clamp01(Time.fixedDeltaTime * 28f), ForceMode.VelocityChange);
+   }
   }
  }
 
@@ -391,9 +434,9 @@ public class ArcadeCar : MonoBehaviour {
  }
 
  void OnDisable() {
-  // Bring the car to a safe halt whenever the component is toggled off
+  activeCars.Remove(this);
   if (wheels == null) return;
-  foreach (var w in wheels) { w.motorTorque = 0; w.brakeTorque = BrakeTorque; }
+  foreach (var w in wheels) { if (w) { w.motorTorque = 0; w.brakeTorque = BrakeTorque; } }
  }
 
  void OnDestroy() {

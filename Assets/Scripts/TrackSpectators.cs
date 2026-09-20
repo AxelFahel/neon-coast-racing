@@ -3,9 +3,11 @@ using UnityEngine;
 
 namespace NeonCoast {
 /// <summary>
-/// Sistema de Público e Pedestres do Circuito (Assistindo e Andando fora da pista).
-/// Gera multidões vivas e pedestres caminhando pelas calçadas, calçadão da praia e atrás dos guard-rails.
-/// Reagem dinamicamente à passagem dos supercarros com animações de comemoração, fotos e celulares brilhantes.
+/// Sistema de Público e Pedestres do Circuito.
+/// Personagens com proporções humanas realistas: cabeça arredondada, torso slim,
+/// pernas e braços cilíndricos, sapatos, mochila, cabelo volumoso.
+/// Animações vivas: torcida, caminhada, fotografia com flash.
+/// Reagem dinamicamente aos carros passando.
 /// </summary>
 public class TrackSpectators : MonoBehaviour {
 
@@ -62,23 +64,25 @@ public class TrackSpectators : MonoBehaviour {
         public float walkProgress;
         public int walkDirection;
         public float flashTimer;
+        // Variação de altura: fator de escala individual
+        public float heightScale;
     }
 
     readonly List<SpectatorInstance> spectators = new List<SpectatorInstance>();
     Transform playerTransform;
 
+    // Pool de materiais compartilhados
+    Material matSkin, matSkinDark, matPants, matPantsDark;
+    Material matCyan, matPink, matYellow, matWhite, matDark, matGreen, matOrange;
+    Material matPhone, matShoe, matHair, matHairBlonde, matHairRed;
+
     void Awake() {
-        // Se já foi gerado no Editor, apenas mapeia e anima
-        if (transform.childCount > 0) {
-            MapExistingChildren();
-            return;
-        }
         SpawnAllSpectators();
     }
 
     void Start() {
-        var player = FindFirstObjectByType<ArcadeCar>();
-        if (player) playerTransform = player.transform;
+        var race = FindFirstObjectByType<RaceSession>();
+        if (race && race.player) playerTransform = race.player.transform;
     }
 
     public void SpawnAllSpectators() {
@@ -88,23 +92,14 @@ public class TrackSpectators : MonoBehaviour {
         }
         spectators.Clear();
 
-        // Cria materiais compartilhados leves
-        var litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-        var unlitShader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? litShader;
+        CreateMaterials();
 
-        Material matSkin = CreateMat(litShader, "SpecSkin", new Color(0.88f, 0.68f, 0.54f), 0.1f, 0.3f);
-        Material matPants = CreateMat(litShader, "SpecPants", new Color(0.12f, 0.14f, 0.18f), 0.0f, 0.2f);
-        Material matCyan = CreateMat(litShader, "SpecCyan", new Color(0.05f, 0.85f, 1.0f), 0.0f, 0.7f, new Color(0.05f, 0.85f, 1f) * 1.5f);
-        Material matPink = CreateMat(litShader, "SpecPink", new Color(1.0f, 0.12f, 0.45f), 0.0f, 0.7f, new Color(1f, 0.12f, 0.45f) * 1.5f);
-        Material matYellow = CreateMat(litShader, "SpecYellow", new Color(1.0f, 0.82f, 0.10f), 0.0f, 0.6f, new Color(1f, 0.82f, 0.1f) * 1.2f);
-        Material matWhite = CreateMat(litShader, "SpecWhite", new Color(0.92f, 0.94f, 0.96f), 0.0f, 0.5f);
-        Material matDark = CreateMat(litShader, "SpecDark", new Color(0.18f, 0.20f, 0.24f), 0.0f, 0.4f);
-        Material matPhone = CreateMat(unlitShader, "SpecPhoneScreen", Color.white, 0f, 0f, new Color(1.8f, 2.2f, 2.5f));
-
-        Material[] jacketMats = new Material[] { matCyan, matPink, matYellow, matWhite, matDark };
+        Material[] jacketMats = new Material[] { matCyan, matPink, matYellow, matWhite, matDark, matGreen, matOrange };
+        Material[] pantsMats  = new Material[] { matPants, matPantsDark, matDark };
+        Material[] skinMats   = new Material[] { matSkin, matSkinDark };
+        Material[] hairMats   = new Material[] { matHair, matHairBlonde, matHairRed, matDark };
 
         // ── 1. RETA PRINCIPAL E LARGADA (t = 0.97 até 0.06) ───────────────────
-        // Grandes grupos de torcedores vibrando, tirando fotos e assistindo
         for (int i = 0; i < 36; i++) {
             float t = Mathf.Repeat(-0.025f + (i / 36f) * 0.08f, 1f);
             int side = (i % 2 == 0) ? -1 : 1;
@@ -115,11 +110,14 @@ public class TrackSpectators : MonoBehaviour {
             SpectatorType st = (i % 4 == 0) ? SpectatorType.Photographer :
                                (i % 3 == 0) ? SpectatorType.CheeringFan : SpectatorType.WatchingFan;
             Material jacket = jacketMats[i % jacketMats.Length];
-            CreateSpectator($"Fan_Start_{i}", pos, Quaternion.LookRotation(toTrack), st, jacket, matPants, matSkin, matPhone, i * 0.23f);
+            Material pants  = pantsMats[i % pantsMats.Length];
+            Material skin   = skinMats[i % skinMats.Length];
+            Material hair   = hairMats[i % hairMats.Length];
+            CreateSpectator($"Fan_Start_{i}", pos, Quaternion.LookRotation(toTrack), st,
+                            jacket, pants, skin, matPhone, hair, matShoe, i * 0.23f);
         }
 
-        // ── 2. PEDESTRES ANDANDO PELO CALÇADÃO DA PRAIA (t = 0.18 até 0.38) ───
-        // Pessoas passeando suavemente pelas calçadas fora do circuito
+        // ── 2. PEDESTRES CALÇADÃO DA PRAIA (t = 0.18 até 0.38) ───────────────
         for (int i = 0; i < 28; i++) {
             float t = 0.18f + (i / 28f) * 0.20f;
             float distFromCenter = 11.8f + (i % 2) * 1.5f;
@@ -128,16 +126,19 @@ public class TrackSpectators : MonoBehaviour {
 
             SpectatorType st = (i % 3 == 0) ? SpectatorType.WalkingPedestrian : SpectatorType.WatchingFan;
             Material jacket = jacketMats[(i + 2) % jacketMats.Length];
-            var spec = CreateSpectator($"Promenade_Person_{i}", pos, Quaternion.LookRotation(walkDir), st, jacket, matPants, matSkin, matPhone, i * 0.37f);
+            Material pants  = pantsMats[(i + 1) % pantsMats.Length];
+            Material skin   = skinMats[(i + 1) % skinMats.Length];
+            Material hair   = hairMats[(i + 2) % hairMats.Length];
+            var spec = CreateSpectator($"Promenade_Person_{i}", pos, Quaternion.LookRotation(walkDir), st,
+                                       jacket, pants, skin, matPhone, hair, matShoe, i * 0.37f);
             if (spec != null) {
                 spec.walkSpeed = 1.1f + (i % 3) * 0.25f;
-                spec.walkRange = 12f + (i % 4) * 4f;
+                spec.walkRange = 3f;
                 spec.walkDirection = (i % 2 == 0) ? 1 : -1;
             }
         }
 
-        // ── 3. CURVA DO PORTO / CHICANE URBANA (t = 0.45 até 0.62) ────────────
-        // Torcedores em pontos estratégicos de frenagem e curvas
+        // ── 3. CURVA DO PORTO / CHICANE URBANA (t = 0.45 até 0.62) ───────────
         for (int i = 0; i < 26; i++) {
             float t = 0.45f + (i / 26f) * 0.17f;
             int side = (i % 2 == 0) ? 1 : -1;
@@ -147,11 +148,14 @@ public class TrackSpectators : MonoBehaviour {
 
             SpectatorType st = (i % 2 == 0) ? SpectatorType.CheeringFan : SpectatorType.Photographer;
             Material jacket = jacketMats[(i + 1) % jacketMats.Length];
-            CreateSpectator($"Corner_Fan_{i}", pos, Quaternion.LookRotation(toTrack), st, jacket, matPants, matSkin, matPhone, i * 0.41f);
+            Material pants  = pantsMats[i % pantsMats.Length];
+            Material skin   = skinMats[i % skinMats.Length];
+            Material hair   = hairMats[(i + 1) % hairMats.Length];
+            CreateSpectator($"Corner_Fan_{i}", pos, Quaternion.LookRotation(toTrack), st,
+                            jacket, pants, skin, matPhone, hair, matShoe, i * 0.41f);
         }
 
-        // ── 4. CALÇADAS DO VIADUTO E RETORNO (t = 0.72 até 0.94) ──────────────
-        // Pedestres caminhando e pessoas apoiadas no gradil olhando o viaduto
+        // ── 4. CALÇADAS DO VIADUTO (t = 0.72 até 0.94) ───────────────────────
         for (int i = 0; i < 28; i++) {
             float t = 0.72f + (i / 28f) * 0.22f;
             int side = (i % 2 == 0) ? -1 : 1;
@@ -163,43 +167,127 @@ public class TrackSpectators : MonoBehaviour {
             fwd.y = 0;
 
             Material jacket = jacketMats[(i + 3) % jacketMats.Length];
-            var spec = CreateSpectator($"Viaduct_Person_{i}", pos, Quaternion.LookRotation(fwd), st, jacket, matPants, matSkin, matPhone, i * 0.29f);
+            Material pants  = pantsMats[(i + 2) % pantsMats.Length];
+            Material skin   = skinMats[i % skinMats.Length];
+            Material hair   = hairMats[(i + 3) % hairMats.Length];
+            var spec = CreateSpectator($"Viaduct_Person_{i}", pos, Quaternion.LookRotation(fwd), st,
+                                       jacket, pants, skin, matPhone, hair, matShoe, i * 0.29f);
             if (spec != null) {
                 spec.walkSpeed = 1.0f + (i % 2) * 0.3f;
-                spec.walkRange = 10f + (i % 3) * 3f;
+                spec.walkRange = 3f;
                 spec.walkDirection = (i % 2 == 0) ? 1 : -1;
             }
         }
     }
 
-    SpectatorInstance CreateSpectator(string name, Vector3 pos, Quaternion rot, SpectatorType type, Material jacket, Material pants, Material skin, Material phone, float offset) {
+    void CreateMaterials() {
+        var litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        var unlitShader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? litShader;
+
+        // Tons de pele variados (não apenas um padrão)
+        matSkin     = CreateMat(litShader, "SpecSkin_Light",   new Color(0.90f, 0.72f, 0.56f), 0.0f, 0.28f);
+        matSkinDark = CreateMat(litShader, "SpecSkin_Dark",    new Color(0.42f, 0.28f, 0.18f), 0.0f, 0.25f);
+
+        // Calças e shorts variados
+        matPants     = CreateMat(litShader, "SpecPants_Dark",  new Color(0.10f, 0.12f, 0.16f), 0.0f, 0.18f);
+        matPantsDark = CreateMat(litShader, "SpecPants_Navy",  new Color(0.06f, 0.10f, 0.22f), 0.0f, 0.20f);
+
+        // Roupas neon variadas
+        matCyan   = CreateMat(litShader, "SpecCyan",   new Color(0.05f, 0.85f, 1.0f),  0.0f, 0.65f, new Color(0.02f, 0.5f, 0.6f));
+        matPink   = CreateMat(litShader, "SpecPink",   new Color(1.0f, 0.12f, 0.45f),  0.0f, 0.65f, new Color(0.5f, 0.02f, 0.2f));
+        matYellow = CreateMat(litShader, "SpecYellow", new Color(1.0f, 0.82f, 0.10f),  0.0f, 0.55f, new Color(0.5f, 0.35f, 0.01f));
+        matWhite  = CreateMat(litShader, "SpecWhite",  new Color(0.92f, 0.94f, 0.96f), 0.0f, 0.45f);
+        matDark   = CreateMat(litShader, "SpecDark",   new Color(0.16f, 0.18f, 0.22f), 0.0f, 0.35f);
+        matGreen  = CreateMat(litShader, "SpecGreen",  new Color(0.05f, 0.88f, 0.42f), 0.0f, 0.60f, new Color(0.01f, 0.4f, 0.15f));
+        matOrange = CreateMat(litShader, "SpecOrange", new Color(1.0f, 0.48f, 0.05f),  0.0f, 0.55f, new Color(0.5f, 0.18f, 0.01f));
+
+        // Cabelos variados
+        matHair       = CreateMat(litShader, "SpecHair_Black",  new Color(0.08f, 0.07f, 0.07f), 0.0f, 0.30f);
+        matHairBlonde = CreateMat(litShader, "SpecHair_Blonde", new Color(0.88f, 0.72f, 0.32f), 0.0f, 0.32f);
+        matHairRed    = CreateMat(litShader, "SpecHair_Red",    new Color(0.62f, 0.14f, 0.10f), 0.0f, 0.28f);
+
+        // Acessórios
+        matPhone = CreateMat(unlitShader, "SpecPhoneScreen", Color.white, 0f, 0f, new Color(1.8f, 2.2f, 2.5f));
+        matShoe  = CreateMat(litShader, "SpecShoe",          new Color(0.12f, 0.12f, 0.14f), 0.0f, 0.55f);
+    }
+
+    SpectatorInstance CreateSpectator(string name, Vector3 pos, Quaternion rot, SpectatorType type,
+                                      Material jacket, Material pants, Material skin,
+                                      Material phone, Material hair, Material shoe, float offset) {
+        // Somente personagens ao nível do chão
+        if (pos.y > 1.2f) return null;
+        pos.y = 0.02f;
+
         var root = new GameObject(name);
         root.transform.SetParent(transform, false);
         root.transform.position = pos;
         root.transform.rotation = rot;
 
-        // Torso / Jaqueta Streetwear
-        var torso = CreateBox("Torso", root.transform, new Vector3(0, 1.12f, 0), new Vector3(0.36f, 0.48f, 0.22f), jacket);
+        // Variação de altura: 90% a 108% da altura padrão
+        float heightFactor = 0.90f + Mathf.Repeat(offset * 7.3f, 0.18f);
+        root.transform.localScale = Vector3.one * heightFactor;
 
-        // Cabeça com boné/viseira cyberpunk
-        var head = CreateBox("Head", torso.transform, new Vector3(0, 0.36f, 0), new Vector3(0.20f, 0.22f, 0.20f), skin);
-        CreateBox("Visor", head.transform, new Vector3(0, 0.04f, 0.10f), new Vector3(0.21f, 0.06f, 0.06f), jacket);
+        // ──────────────────────────────────────────────────────────────────────
+        // ANATOMIA HUMANA PROPORCIONAL
+        // Referência: altura total ~1.75m (unidades Unity)
+        // ──────────────────────────────────────────────────────────────────────
 
-        // Pernas (com calça e tênis)
-        var leftLeg = CreateBox("Leg_L", root.transform, new Vector3(-0.10f, 0.46f, 0), new Vector3(0.12f, 0.64f, 0.13f), pants);
-        var rightLeg = CreateBox("Leg_R", root.transform, new Vector3(0.10f, 0.46f, 0), new Vector3(0.12f, 0.64f, 0.13f), pants);
+        // PERNAS — cilíndricas, com articulação de joelho implícita
+        // Coxa esquerda
+        var leftThigh  = CreateLimb("Thigh_L",  root.transform, new Vector3(-0.105f, 0.72f, 0f), new Vector3(0.115f, 0.36f, 0.115f), pants);
+        var rightThigh = CreateLimb("Thigh_R",  root.transform, new Vector3( 0.105f, 0.72f, 0f), new Vector3(0.115f, 0.36f, 0.115f), pants);
+        // Canela
+        var leftShin   = CreateLimb("Shin_L",   leftThigh.transform,  new Vector3(0f, -0.36f, 0.01f), new Vector3(0.095f, 0.33f, 0.095f), pants);
+        var rightShin  = CreateLimb("Shin_R",   rightThigh.transform, new Vector3(0f, -0.36f, 0.01f), new Vector3(0.095f, 0.33f, 0.095f), pants);
+        // Sapato
+        CreateBox("Shoe_L", leftShin.transform,  new Vector3(0f, -0.20f, 0.05f), new Vector3(0.12f, 0.09f, 0.22f), shoe);
+        CreateBox("Shoe_R", rightShin.transform, new Vector3(0f, -0.20f, 0.05f), new Vector3(0.12f, 0.09f, 0.22f), shoe);
 
-        // Braços
-        var leftArm = CreateBox("Arm_L", torso.transform, new Vector3(-0.24f, 0.10f, 0), new Vector3(0.10f, 0.44f, 0.11f), jacket);
-        var rightArm = CreateBox("Arm_R", torso.transform, new Vector3(0.24f, 0.10f, 0), new Vector3(0.10f, 0.44f, 0.11f), jacket);
+        // QUADRIL — une pernas ao torso
+        var hips = CreateBox("Hips", root.transform, new Vector3(0f, 1.07f, 0f), new Vector3(0.30f, 0.14f, 0.19f), pants);
 
+        // TORSO — slim, com curvatura humana (capsule)
+        var torso = CreateLimb("Torso", root.transform, new Vector3(0f, 1.34f, 0f), new Vector3(0.30f, 0.36f, 0.25f), jacket);
+
+        // PESCOÇO
+        var neck = CreateLimb("Neck", torso.transform, new Vector3(0f, 0.22f, 0f), new Vector3(0.10f, 0.10f, 0.10f), skin);
+
+        // CABEÇA — esférica, tamanho proporcional
+        var head = CreateSphere("Head", neck.transform, new Vector3(0f, 0.14f, 0f), 0.20f, skin);
+
+        // CABELO — forma volumosa sobre a cabeça
+        var hairTop = CreateSphere("Hair_Top", head.transform, new Vector3(0f, 0.06f, -0.01f), 0.195f, hair);
+        // Viseira / boné cyberpunk em 50% dos personagens
+        bool hasCap = ((int)(offset * 100f) % 2 == 0);
+        if (hasCap) {
+            CreateBox("Cap_Bill", head.transform, new Vector3(0f, 0.04f, 0.14f), new Vector3(0.22f, 0.04f, 0.14f), jacket);
+            CreateSphere("Cap_Crown", head.transform, new Vector3(0f, 0.09f, -0.01f), 0.185f, jacket);
+        }
+
+        // BRAÇOS — cilíndricos com antebraço
+        var leftUpperArm  = CreateLimb("UpperArm_L",  torso.transform, new Vector3(-0.22f, 0.10f, 0f),  new Vector3(0.10f, 0.28f, 0.10f), jacket);
+        var rightUpperArm = CreateLimb("UpperArm_R",  torso.transform, new Vector3( 0.22f, 0.10f, 0f),  new Vector3(0.10f, 0.28f, 0.10f), jacket);
+        var leftForearm   = CreateLimb("Forearm_L",   leftUpperArm.transform,  new Vector3(0f, -0.30f, 0.01f), new Vector3(0.085f, 0.25f, 0.085f), skin);
+        var rightForearm  = CreateLimb("Forearm_R",   rightUpperArm.transform, new Vector3(0f, -0.30f, 0.01f), new Vector3(0.085f, 0.25f, 0.085f), skin);
+        // Mãos
+        CreateBox("Hand_L", leftForearm.transform,  new Vector3(0f, -0.16f, 0f), new Vector3(0.08f, 0.09f, 0.07f), skin);
+        CreateBox("Hand_R", rightForearm.transform, new Vector3(0f, -0.16f, 0f), new Vector3(0.08f, 0.09f, 0.07f), skin);
+
+        // Mochila em 30% dos personagens
+        bool hasBackpack = ((int)(offset * 131f) % 3 == 0);
+        if (hasBackpack) {
+            CreateBox("Backpack", torso.transform, new Vector3(0f, 0.02f, -0.16f), new Vector3(0.22f, 0.32f, 0.12f), matDark ?? pants);
+            CreateBox("Backpack_Pocket", torso.transform, new Vector3(0f, -0.08f, -0.22f), new Vector3(0.14f, 0.14f, 0.06f), jacket);
+        }
+
+        // Celular na mão direita para fotógrafos
         Transform phoneLightT = null;
         if (type == SpectatorType.Photographer) {
-            // Celular na mão direita
-            var phoneObj = CreateBox("Phone", rightArm.transform, new Vector3(0, -0.22f, 0.12f), new Vector3(0.08f, 0.14f, 0.02f), phone);
+            var phoneObj = CreateBox("Phone", rightForearm.transform, new Vector3(0f, -0.10f, 0.06f), new Vector3(0.07f, 0.12f, 0.015f), phone);
             phoneLightT = phoneObj.transform;
-            rightArm.transform.localRotation = Quaternion.Euler(-65f, 15f, 0);
-            leftArm.transform.localRotation = Quaternion.Euler(-45f, -15f, 0);
+            rightUpperArm.transform.localRotation = Quaternion.Euler(-60f, 12f, 0f);
+            leftUpperArm.transform.localRotation  = Quaternion.Euler(-40f, -12f, 0f);
+            rightForearm.transform.localRotation  = Quaternion.Euler(-20f, 0f, 0f);
         }
 
         var instance = new SpectatorInstance {
@@ -207,32 +295,69 @@ public class TrackSpectators : MonoBehaviour {
             type = type,
             head = head.transform,
             torso = torso.transform,
-            leftArm = leftArm.transform,
-            rightArm = rightArm.transform,
-            leftLeg = leftLeg.transform,
-            rightLeg = rightLeg.transform,
+            leftArm = leftUpperArm.transform,
+            rightArm = rightUpperArm.transform,
+            leftLeg = leftThigh.transform,
+            rightLeg = rightThigh.transform,
             phoneLight = phoneLightT,
             basePos = pos,
             forwardDir = rot * Vector3.forward,
             animOffset = offset,
             walkSpeed = 1.2f,
-            walkRange = 12f,
-            walkDirection = 1
+            walkRange = 3f,
+            walkDirection = 1,
+            heightScale = heightFactor
         };
 
         spectators.Add(instance);
         return instance;
     }
 
+    // Cria um segmento cilíndrico de membro (Capsule com pivô no topo)
+    GameObject CreateLimb(string n, Transform parent, Vector3 localPos, Vector3 scale, Material mat) {
+        var pivot = new GameObject(n);
+        pivot.transform.SetParent(parent, false);
+        pivot.transform.localPosition = localPos;
+
+        var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        go.name = "Geometry";
+        go.transform.SetParent(pivot.transform, false);
+        // Pivô no topo: desloca a cápsula para baixo pelo seu raio de altura
+        go.transform.localPosition = new Vector3(0, -scale.y * 0.5f, 0);
+        go.transform.localScale = new Vector3(scale.x, scale.y * 0.5f, scale.z);
+        DestroyImmediate(go.GetComponent<Collider>());
+        go.GetComponent<Renderer>().sharedMaterial = mat;
+        return pivot;
+    }
+
+    // Cria uma esfera (cabeça, cabelo)
+    GameObject CreateSphere(string n, Transform parent, Vector3 localPos, float radius, Material mat) {
+        var pivot = new GameObject(n);
+        pivot.transform.SetParent(parent, false);
+        pivot.transform.localPosition = localPos;
+
+        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        go.name = "Geometry";
+        go.transform.SetParent(pivot.transform, false);
+        go.transform.localScale = Vector3.one * radius * 2f;
+        DestroyImmediate(go.GetComponent<Collider>());
+        go.GetComponent<Renderer>().sharedMaterial = mat;
+        return pivot;
+    }
+
+    // Cria um cubo simples (acessório)
     GameObject CreateBox(string n, Transform parent, Vector3 localPos, Vector3 scale, Material mat) {
+        var pivot = new GameObject(n);
+        pivot.transform.SetParent(parent, false);
+        pivot.transform.localPosition = localPos;
+
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        go.name = n;
-        go.transform.SetParent(parent, false);
-        go.transform.localPosition = localPos;
+        go.name = "Geometry";
+        go.transform.SetParent(pivot.transform, false);
         go.transform.localScale = scale;
         DestroyImmediate(go.GetComponent<Collider>());
         go.GetComponent<Renderer>().sharedMaterial = mat;
-        return go;
+        return pivot;
     }
 
     Material CreateMat(Shader shader, string name, Color color, float metallic, float smooth, Color emission = default) {
@@ -249,40 +374,6 @@ public class TrackSpectators : MonoBehaviour {
         return m;
     }
 
-    void MapExistingChildren() {
-        spectators.Clear();
-        foreach (Transform child in transform) {
-            var torso = child.Find("Torso");
-            if (!torso) continue;
-            var head = torso.Find("Head");
-            var armL = torso.Find("Arm_L");
-            var armR = torso.Find("Arm_R");
-            var legL = child.Find("Leg_L");
-            var legR = child.Find("Leg_R");
-
-            SpectatorType st = child.name.Contains("Promenade") || child.name.Contains("Walk")
-                ? SpectatorType.WalkingPedestrian
-                : child.name.Contains("Photo") ? SpectatorType.Photographer : SpectatorType.CheeringFan;
-
-            spectators.Add(new SpectatorInstance {
-                root = child.gameObject,
-                type = st,
-                head = head,
-                torso = torso,
-                leftArm = armL,
-                rightArm = armR,
-                leftLeg = legL,
-                rightLeg = legR,
-                basePos = child.position,
-                forwardDir = child.forward,
-                animOffset = Random.value * 6f,
-                walkSpeed = 1.2f,
-                walkRange = 12f,
-                walkDirection = 1
-            });
-        }
-    }
-
     void Update() {
         if (spectators.Count == 0) return;
         float time = Time.time;
@@ -294,74 +385,121 @@ public class TrackSpectators : MonoBehaviour {
 
             float localTime = time * 2.5f + s.animOffset;
             float distToPlayer = Vector3.Distance(s.root.transform.position, playerPos);
+            if (distToPlayer > 150f) continue;
             bool playerNearby = distToPlayer < 24f;
 
             switch (s.type) {
                 case SpectatorType.WalkingPedestrian:
-                    // Animação de caminhada com ciclo de passadas e deslocamento linear
+                    // Animação de caminhada fluida com ciclo de passadas
                     s.walkProgress += Time.deltaTime * (s.walkSpeed / s.walkRange) * s.walkDirection;
-                    if (s.walkProgress >= 1f) { s.walkProgress = 1f; s.walkDirection = -1; }
+                    if (s.walkProgress >= 1f)  { s.walkProgress = 1f;  s.walkDirection = -1; }
                     else if (s.walkProgress <= -1f) { s.walkProgress = -1f; s.walkDirection = 1; }
 
                     Vector3 moveOffset = s.forwardDir * (s.walkProgress * s.walkRange * 0.5f);
                     s.root.transform.position = s.basePos + moveOffset;
                     s.root.transform.rotation = Quaternion.LookRotation(s.forwardDir * s.walkDirection);
 
-                    // Ciclo de passada: pernas alternam
-                    float walkAngle = Mathf.Sin(time * s.walkSpeed * 5f + s.animOffset) * 28f;
-                    if (s.leftLeg) s.leftLeg.localRotation = Quaternion.Euler(walkAngle, 0, 0);
+                    float walkCycle = time * s.walkSpeed * 5f + s.animOffset;
+                    float walkAngle = Mathf.Sin(walkCycle) * 30f;
+                    float kneeAngle = Mathf.Max(0f, -Mathf.Sin(walkCycle)) * 25f;
+
+                    if (s.leftLeg)  s.leftLeg.localRotation  = Quaternion.Euler(walkAngle, 0, 0);
                     if (s.rightLeg) s.rightLeg.localRotation = Quaternion.Euler(-walkAngle, 0, 0);
-                    if (s.leftArm) s.leftArm.localRotation = Quaternion.Euler(-walkAngle * 0.7f, 0, 0);
-                    if (s.rightArm) s.rightArm.localRotation = Quaternion.Euler(walkAngle * 0.7f, 0, 0);
-                    if (s.torso) s.torso.localPosition = new Vector3(0, 1.12f + Mathf.Abs(Mathf.Sin(time * s.walkSpeed * 10f)) * 0.03f, 0);
+                    // Ação dos braços oposta às pernas (marcha natural)
+                    if (s.leftArm)  s.leftArm.localRotation  = Quaternion.Euler(-walkAngle * 0.6f, 0, 4f);
+                    if (s.rightArm) s.rightArm.localRotation = Quaternion.Euler(walkAngle * 0.6f, 0, -4f);
+                    // Leve balançar do torso
+                    if (s.torso) {
+                        float torsoSwing = Mathf.Sin(walkCycle * 2f) * 2.5f;
+                        s.torso.localRotation = Quaternion.Euler(3f, torsoSwing, 0f);
+                        s.torso.localPosition = new Vector3(0, 1.34f + Mathf.Abs(Mathf.Sin(walkCycle * 2f)) * 0.025f, 0);
+                    }
                     break;
 
                 case SpectatorType.CheeringFan:
-                    // Vibração de torcida: braços no alto, pulinhos quando carro passa
-                    float cheerSpeed = playerNearby ? 6f : 2.5f;
-                    float armSwing = Mathf.Sin(time * cheerSpeed + s.animOffset) * (playerNearby ? 55f : 30f);
-                    float bodyBounce = Mathf.Abs(Mathf.Sin(time * cheerSpeed + s.animOffset)) * (playerNearby ? 0.08f : 0.02f);
+                    // Torcida energética: braços no alto, pulos quando carro passa
+                    float cheerSpeed = playerNearby ? 7f : 2.8f;
+                    float armSwing = Mathf.Sin(time * cheerSpeed + s.animOffset) * (playerNearby ? 22f : 8f);
+                    float bodyBounce = Mathf.Abs(Mathf.Sin(time * cheerSpeed + s.animOffset)) * (playerNearby ? 0.09f : 0.02f);
 
-                    if (s.leftArm) s.leftArm.localRotation = Quaternion.Euler(-140f + armSwing, 0, -15f);
-                    if (s.rightArm) s.rightArm.localRotation = Quaternion.Euler(-140f - armSwing, 0, 15f);
-                    if (s.torso) s.torso.localPosition = new Vector3(0, 1.12f + bodyBounce, 0);
+                    if (s.leftArm)  s.leftArm.localRotation  = Quaternion.Euler(-118f + armSwing, -10f, -18f);
+                    if (s.rightArm) s.rightArm.localRotation = Quaternion.Euler(-108f - armSwing,  10f,  18f);
+                    if (s.torso) {
+                        s.torso.localPosition = new Vector3(0, 1.34f + bodyBounce, 0);
+                        // Leve rotação do tronco durante a torcida
+                        float torsoRot = Mathf.Sin(time * cheerSpeed * 0.5f + s.animOffset) * 6f;
+                        s.torso.localRotation = Quaternion.Euler(0f, torsoRot, 0f);
+                    }
+                    // Pernas dão um saltinho quando carro está perto
+                    if (playerNearby) {
+                        float legBounce = Mathf.Abs(Mathf.Sin(time * cheerSpeed + s.animOffset)) * 8f;
+                        if (s.leftLeg)  s.leftLeg.localRotation  = Quaternion.Euler(-legBounce * 0.5f, 0, 0);
+                        if (s.rightLeg) s.rightLeg.localRotation = Quaternion.Euler( legBounce * 0.5f, 0, 0);
+                    }
+                    // Cabeça segue o carro passando
                     if (s.head && playerNearby) {
                         Vector3 look = (playerPos - s.root.transform.position).normalized;
-                        s.head.rotation = Quaternion.Slerp(s.head.rotation, Quaternion.LookRotation(look), Time.deltaTime * 6f);
+                        look.y = 0;
+                        if (look.sqrMagnitude > 0.01f)
+                            s.head.rotation = Quaternion.Slerp(s.head.rotation, Quaternion.LookRotation(look), Time.deltaTime * 7f);
                     }
                     break;
 
                 case SpectatorType.Photographer:
-                    // Segura o celular filmando a corrida, tirando fotos
-                    float photoBob = Mathf.Sin(localTime * 0.8f) * 4f;
-                    if (s.rightArm) s.rightArm.localRotation = Quaternion.Euler(-70f + photoBob, 15f, 0);
-                    if (s.leftArm) s.leftArm.localRotation = Quaternion.Euler(-55f - photoBob, -15f, 0);
+                    // Segura o celular filmando, ajusta ângulo
+                    float photoBob = Mathf.Sin(localTime * 0.8f) * 5f;
+                    if (s.rightArm) s.rightArm.localRotation = Quaternion.Euler(-65f + photoBob, 12f, 8f);
+                    if (s.leftArm)  s.leftArm.localRotation  = Quaternion.Euler(-50f - photoBob, -12f, -8f);
 
-                    // Flash sutil de foto quando carro passa perto
+                    // Flash de foto quando carro passa perto
                     s.flashTimer -= Time.deltaTime;
                     if (playerNearby && s.flashTimer <= 0f) {
-                        s.flashTimer = Random.Range(1.5f, 3.5f);
+                        s.flashTimer = Random.Range(1.2f, 3.0f);
                         if (s.phoneLight) {
-                            var rend = s.phoneLight.GetComponent<Renderer>();
-                            if (rend && rend.material) rend.material.SetColor("_Color", Color.white * 4f);
+                            var rend = s.phoneLight.GetComponentInChildren<Renderer>();
+                            if (rend) {
+                                var block = new MaterialPropertyBlock();
+                                block.SetColor("_BaseColor", Color.white);
+                                block.SetColor("_EmissionColor", new Color(3f, 3.5f, 4f));
+                                rend.SetPropertyBlock(block);
+                            }
+                        }
+                    }
+                    // Cabeça levemente inclinada para o visor
+                    if (s.head) {
+                        s.head.localRotation = Quaternion.Euler(-12f, 0f, 0f);
+                        if (playerNearby) {
+                            Vector3 look = (playerPos - s.root.transform.position).normalized;
+                            look.y = 0;
+                            if (look.sqrMagnitude > 0.01f)
+                                s.head.rotation = Quaternion.Slerp(s.head.rotation, Quaternion.LookRotation(look), Time.deltaTime * 5f);
                         }
                     }
                     break;
 
                 case SpectatorType.WatchingFan:
                 default:
-                    // Apoia no guard-rail, olhando para a passagem dos carros
-                    float idleHead = Mathf.Sin(time * 1.2f + s.animOffset) * 12f;
+                    // Apoia no guard-rail, olhando a pista com leve balanço
+                    float idleSwing = Mathf.Sin(time * 0.9f + s.animOffset) * 4f;
+                    float idleLean  = Mathf.Sin(time * 1.3f + s.animOffset + 1f) * 2.5f;
+                    if (s.torso) s.torso.localRotation = Quaternion.Euler(idleLean, idleSwing, 0f);
+
+                    // Braços descansados, com leve balançar relaxado
+                    if (s.leftArm)  s.leftArm.localRotation  = Quaternion.Euler(-12f + Mathf.Sin(time * 1.4f) * 4f, 0, 8f);
+                    if (s.rightArm) s.rightArm.localRotation = Quaternion.Euler(-12f - Mathf.Sin(time * 1.4f) * 4f, 0, -8f);
+
+                    // Cabeça segue o carro ou faz varredura casual da pista
                     if (s.head) {
                         if (playerNearby) {
                             Vector3 look = (playerPos - s.root.transform.position).normalized;
-                            s.head.rotation = Quaternion.Slerp(s.head.rotation, Quaternion.LookRotation(look), Time.deltaTime * 5f);
+                            look.y = 0;
+                            if (look.sqrMagnitude > 0.01f)
+                                s.head.rotation = Quaternion.Slerp(s.head.rotation, Quaternion.LookRotation(look), Time.deltaTime * 5f);
                         } else {
-                            s.head.localRotation = Quaternion.Euler(0, idleHead, 0);
+                            float headScan = Mathf.Sin(time * 1.1f + s.animOffset) * 18f;
+                            s.head.localRotation = Quaternion.Euler(-3f, headScan, 0f);
                         }
                     }
-                    if (s.leftArm) s.leftArm.localRotation = Quaternion.Euler(-15f + Mathf.Sin(time * 1.5f) * 5f, 0, 0);
-                    if (s.rightArm) s.rightArm.localRotation = Quaternion.Euler(-15f - Mathf.Sin(time * 1.5f) * 5f, 0, 0);
                     break;
             }
         }

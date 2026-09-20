@@ -107,20 +107,144 @@ public static class NeonCoastBuilder {
  }
  static void City(){
   var rng=new System.Random(57);
-  for(int i=0;i<58;i++){
-   float x=-43+(float)rng.NextDouble()*90,z=-120+(float)rng.NextDouble()*210,h=14+(float)rng.NextDouble()*70,w=8+(float)rng.NextDouble()*10,d=8+(float)rng.NextDouble()*12;
-   Vector3 p=new Vector3(x,h/2-1,z);Cube("Skyline tower "+i,p,new Vector3(w,h,d),i%3==0?glass:metal,true);
-   Cube("Rooftop rim",p+Vector3.up*(h/2),new Vector3(w+.2f,.16f,d+.2f),i%3==0?pink:cyan,false);
-   for(int floor=3;floor<h;floor+=4)for(int side=-1;side<=1;side+=2)Cube("Window band",new Vector3(x,floor-1,z+side*(d/2+.025f)),new Vector3(w*.86f,.65f,.035f),i%4==0?white:cyan,false);
+  // ── SKYLINE PRINCIPAL: Torres com variação de recuo, terraço e fachada ───
+  for(int i=0;i<62;i++){
+   float x=-48+(float)rng.NextDouble()*100,z=-125+(float)rng.NextDouble()*215;
+   float h=16+(float)rng.NextDouble()*82,w=8+(float)rng.NextDouble()*11,d=8+(float)rng.NextDouble()*13;
+   float recuo=(float)rng.NextDouble()*4f; // recuo da calçada
+   Vector3 p=new Vector3(x,h/2-1,z);
+   Material fachadaMat = i%3==0?glass:metal;
+   Cube("Skyline tower "+i,p,new Vector3(w,h,d),fachadaMat,true);
+
+   // Terraço / volume de cobertura variado
+   float terH=(float)rng.NextDouble()*8f+3f;
+   float terW=w*(0.55f+(float)rng.NextDouble()*0.35f);
+   float terD=d*(0.55f+(float)rng.NextDouble()*0.35f);
+   if(i%3!=0) Cube("Penthouse "+i,p+Vector3.up*(h/2+terH/2),new Vector3(terW,terH,terD),i%2==0?metal:concrete,true);
+
+   // Borda de telhado neon
+   Material rimMat = (i%5==0)?pink:(i%5==1)?cyan:(i%5==2)?white:(i%5==3)?pink:cyan;
+   Cube("Rooftop rim "+i,p+Vector3.up*(h/2),new Vector3(w+.25f,.14f,d+.25f),rimMat,false);
+
+   // Janelas por andar (linhas horizontais de vidro) em múltiplos lados
+   for(int floor=4;floor<h-2;floor+=4){
+    for(int side=-1;side<=1;side+=2){
+     // Fachada frontal e traseira
+     Cube("WinBand_"+i+"_"+floor,new Vector3(x,floor-1,z+side*(d/2+.03f)),new Vector3(w*.88f,.6f,.04f),i%4==0?white:cyan,false);
+     // Fachadas laterais em torres altas
+     if(h>40) Cube("WinBand_Side_"+i+"_"+floor,new Vector3(x+side*(w/2+.03f),floor-1,z),new Vector3(.04f,.6f,d*.88f),i%3==0?white:pink,false);
+    }
+   }
+
+   // Placas luminosas de negócios na fachada (torres próximas à pista)
+   if(Mathf.Abs(x)<30 && i%4==0){
+    var sign=Cube("Neon Sign "+i,p+new Vector3(0,h*.3f,d/2+.08f),new Vector3(w*.7f,1.8f,.1f),cyan,false);
+    WorldText("NEON DISTRICT",p+new Vector3(0,h*.3f,d/2+.14f),Quaternion.identity,.28f,Color.cyan);
+   }
   }
-  for(int i=0;i<22;i++){
-   Vector3 p=new Vector3(-137,-.5f,-185+i*17);Cube("Coastal promenade",p,new Vector3(20,.4f,16.9f),concrete,true);
-   Cube("Palm trunk",p+Vector3.up*3,new Vector3(.25f,6,.25f),metal,false);
-   for(int leaf=0;leaf<6;leaf++){var go=Cube("Palm frond",p+Vector3.up*6,new Vector3(.65f,.13f,5),grass,false);go.transform.rotation=Quaternion.Euler(20,leaf*60,0);}
-   if(i%3==0)Cube("Promenade neon",p+Vector3.left*8+Vector3.up*.25f,new Vector3(.15f,.15f,15),cyan,false);
+
+  // ── CALÇADÃO DA PRAIA — PROMENADE MAIS REALISTA ───────────────────────
+  for(int i=0;i<24;i++){
+   Vector3 p=new Vector3(-137,-.5f,-190+i*17);
+   Cube("Coastal promenade",p,new Vector3(22,.42f,16.9f),concrete,true);
+
+   // Grade/parapeito à beira-mar
+   for(int g=0;g<5;g++) Cube("Railing "+i+"_"+g,p+new Vector3(-9+g*4.5f,.6f,-8),new Vector3(.12f,.9f,.12f),metal,true);
+   Cube("Railing bar "+i,p+new Vector3(-9,.95f,-8),new Vector3(18,.08f,.08f),metal,false);
+
+   // Palmeiras curvadas com tronco e folhas reais
+   float palmX=p.x+(float)(new System.Random(i*7+3).NextDouble())*4f-2f;
+   float palmZ=p.z+(float)(new System.Random(i*7+4).NextDouble())*6f-3f;
+   BuildPalm(new Vector3(palmX,.0f,palmZ),i);
+
+   // Bancos e mesas de calçadão a cada 2 unidades
+   if(i%2==0){
+    Cube("Bench "+i,p+new Vector3(0,.48f,-2f),new Vector3(2.5f,.14f,.65f),metal,false);
+    Cube("Bench leg A "+i,p+new Vector3(-.8f,.22f,-2f),new Vector3(.1f,.44f,.1f),metal,true);
+    Cube("Bench leg B "+i,p+new Vector3( .8f,.22f,-2f),new Vector3(.1f,.44f,.1f),metal,true);
+   }
+
+   // Bares/quiosques iluminados a cada 3
+   if(i%3==0){
+    Cube("Kiosk "+i,p+new Vector3(4f,.6f,3f),new Vector3(3.5f,2.8f,3.5f),concrete,true);
+    Cube("Kiosk roof "+i,p+new Vector3(4f,2.1f,3f),new Vector3(4.2f,.3f,4.2f),cyan,false);
+    // Luz interna do bar
+    var barLight=new GameObject("Bar light "+i).AddComponent<Light>();
+    barLight.transform.parent=world;barLight.transform.position=p+new Vector3(4f,1.5f,3f);
+    barLight.type=LightType.Point;barLight.range=5f;barLight.intensity=8f;
+    barLight.color=new Color(.95f,.78f,.38f);barLight.shadows=LightShadows.None;
+    // Placa de neon do bar
+    WorldText("BAR",p+new Vector3(4f,2.5f,5f),Quaternion.identity,.3f,new Color(1f,.6f,.1f));
+   }
+
+   // Neon de piso do calçadão
+   if(i%2==1) Cube("Promenade neon floor",p+new Vector3(-8f,.25f,0),new Vector3(.12f,.08f,15f),i%4<2?cyan:pink,false);
   }
-  for(int i=0;i<8;i++){float t=.24f+i*.075f;Vector3 p=Point(t)+Right(t)*11+Vector3.up*3;var sign=Cube("Direction sign",p,new Vector3(2.5f,1.3f,.12f),metal,false);sign.transform.rotation=Quaternion.LookRotation(Forward(t));WorldText("> > >",p-Forward(t)*.08f,Quaternion.LookRotation(Forward(t)),.4f,Color.white);}
+
+  // ── PLACAS DE DIREÇÃO / SINALIZAÇÃO URBANA ────────────────────────────
+  for(int i=0;i<8;i++){
+   float t=.24f+i*.075f;
+   Vector3 p=Point(t)+Right(t)*11+Vector3.up*3;
+   var sign=Cube("Direction sign",p,new Vector3(2.5f,1.3f,.12f),metal,false);
+   sign.transform.rotation=Quaternion.LookRotation(Forward(t));
+   WorldText("> > >",p-Forward(t)*.08f,Quaternion.LookRotation(Forward(t)),.4f,Color.white);
+  }
+
+  // ── SEMÁFOROS NAS ENTRADAS DO CIRCUITO URBANO ─────────────────────────
+  for(int i=0;i<4;i++){
+   float t=(float)i/4f;
+   Vector3 sp=Point(t)+Right(t)*9.5f+Vector3.up;
+   Cube("Traffic pole "+i,sp+Vector3.up*2.5f,new Vector3(.12f,5f,.12f),metal,true);
+   Cube("Traffic head "+i,sp+Vector3.up*5.5f,new Vector3(.28f,.75f,.22f),metal,true);
+   // Luzes do semáforo
+   Cube("Tlight red "+i,  sp+Vector3.up*5.75f+Forward(t)*.12f,new Vector3(.14f,.18f,.06f),pink,false);
+   Cube("Tlight green "+i,sp+Vector3.up*5.30f+Forward(t)*.12f,new Vector3(.14f,.18f,.06f),cyan,false);
+   var tLight=new GameObject("Semaphore light "+i).AddComponent<Light>();
+   tLight.transform.parent=world;tLight.transform.position=sp+Vector3.up*5.5f;
+   tLight.type=LightType.Point;tLight.range=6f;tLight.intensity=10f;
+   tLight.color=i%2==0?new Color(.05f,.9f,.3f):new Color(.9f,.1f,.15f);
+   tLight.shadows=LightShadows.None;
+  }
+
+  // ── POSTES EXTRAS DE RUA COM LUZ DE NEON ─────────────────────────────
+  for(int i=0;i<6;i++){
+   float t=(float)i/6f+.12f;
+   Vector3 pp=Point(t)-Right(t)*10.5f;
+   Cube("Street neon post "+i,pp+Vector3.up*4f,new Vector3(.1f,8f,.1f),metal,true);
+   Cube("Neon strip "+i,pp+Vector3.up*7.8f,new Vector3(1.8f,.1f,.1f),i%2==0?cyan:pink,false);
+   var postL=new GameObject("Post neon light "+i).AddComponent<Light>();
+   postL.transform.parent=world;postL.transform.position=pp+Vector3.up*7.5f;
+   postL.type=LightType.Point;postL.range=14f;postL.intensity=12f;
+   postL.color=i%2==0?new Color(.05f,.85f,1f):new Color(.95f,.1f,.4f);
+   postL.shadows=LightShadows.None;
+  }
  }
+
+ static void BuildPalm(Vector3 base3, int seed){
+  var rng2=new System.Random(seed*13+7);
+  // Tronco curvado (3 segmentos)
+  float[] leanX=new float[]{0f,(float)rng2.NextDouble()*.3f-.15f,(float)rng2.NextDouble()*.5f-.25f};
+  float[] leanZ=new float[]{0f,(float)rng2.NextDouble()*.3f-.15f,(float)rng2.NextDouble()*.5f-.25f};
+  float palmH=5f+(float)rng2.NextDouble()*2f;
+  for(int seg=0;seg<3;seg++){
+   float yBot=base3.y+seg*(palmH/3f);
+   float yTop=base3.y+(seg+1)*(palmH/3f);
+   Vector3 segPos=new Vector3(base3.x+leanX[seg],yBot+(yTop-yBot)/2f,base3.z+leanZ[seg]);
+   var trunk=Cube("Palm trunk "+seed+"_"+seg,segPos,new Vector3(.22f,palmH/3f+.05f,.22f),metal,false);
+  }
+  // Topo da palmeira
+  Vector3 top=new Vector3(base3.x+leanX[2],base3.y+palmH,base3.z+leanZ[2]);
+  // 7 folhas ao redor
+  Material leafMat=grass;
+  for(int leaf=0;leaf<7;leaf++){
+   float ang=leaf*360f/7f+(float)rng2.NextDouble()*20f;
+   float len=3.8f+(float)rng2.NextDouble()*1.2f;
+   float tilt=18f+(float)rng2.NextDouble()*12f;
+   var frond=Cube("Frond "+seed+"_"+leaf,top+Vector3.up*.3f,new Vector3(.55f,.1f,len),leafMat,false);
+   frond.transform.rotation=Quaternion.Euler(tilt,ang,0);
+  }
+ }
+
  static ArcadeCar Car(){
   var root=new GameObject("Player Aster GT");root.layer=2;root.transform.position=Point(0)+Vector3.up*.8f;root.transform.rotation=Quaternion.LookRotation(Forward(0));
   root.AddComponent<Rigidbody>();var col=root.AddComponent<BoxCollider>();col.center=new Vector3(0,.58f,0);col.size=new Vector3(1.86f,.7f,4.15f);
