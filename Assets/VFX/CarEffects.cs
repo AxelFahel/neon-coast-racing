@@ -1,4 +1,7 @@
 using UnityEngine;
+using UnityEngine.Audio;
+using UnityEngine.InputSystem;
+using System.Collections;
 namespace NeonCoast {
 [RequireComponent(typeof(ArcadeCar))]
 public class CarEffects : MonoBehaviour {
@@ -6,6 +9,7 @@ public class CarEffects : MonoBehaviour {
  AudioSource engine, screech, wind, nitroSfx, impactSrc;
  AudioClip engineClip, screechClip, windClip, nitroClip, impactClip;
  ParticleSystem[] exhaust; ParticleSystem sparkSystem;
+ Coroutine rumbleRoutine;
  TrailRenderer[] exhaustTrails;
  Light[] exhaustLights;
  static Texture2D softGlowTex;
@@ -49,19 +53,24 @@ public class CarEffects : MonoBehaviour {
 
  void Start(){
   car=GetComponent<ArcadeCar>(); isPlayer=!car.automation;
+  var mixer=Resources.Load<AudioMixer>("NeonCoastMixer");
+  var engineGroup=Group(mixer,"Engine");
+  var tiresGroup=Group(mixer,"Tires");
+  var windGroup=Group(mixer,"Wind");
+  var sfxGroup=Group(mixer,"SFX");
 
   // Engine — all cars
-  engine=Src(.075f,true,.65f,4,65);
+  engine=Src(.075f,true,.65f,4,65,engineGroup);
   engineClip=SynthEngine(); engine.clip=engineClip; engine.Play();
 
   var pMat = GetNitroMaterial();
 
   // Player-only audio + VFX
   if(isPlayer){
-   screech=Src(0,true,.7f,3,35); screechClip=SynthBandNoise(8192,3200,600,77); screech.clip=screechClip; screech.Play();
-   wind=Src(0,true,.35f,5,80); windClip=SynthBandNoise(8192,350,250,33); wind.clip=windClip; wind.Play();
-   nitroSfx=Src(0,true,.5f,3,45); nitroClip=SynthNitro(); nitroSfx.clip=nitroClip; nitroSfx.Play();
-   impactSrc=Src(0,false,.85f,2,30); impactClip=SynthImpact(); impactSrc.clip=impactClip;
+   screech=Src(0,true,.7f,3,35,tiresGroup); screechClip=SynthBandNoise(8192,3200,600,77); screech.clip=screechClip; screech.Play();
+   wind=Src(0,true,.35f,5,80,windGroup); windClip=SynthBandNoise(8192,350,250,33); wind.clip=windClip; wind.Play();
+   nitroSfx=Src(0,true,.5f,3,45,sfxGroup); nitroClip=SynthNitro(); nitroSfx.clip=nitroClip; nitroSfx.Play();
+   impactSrc=Src(0,false,.85f,2,30,sfxGroup); impactClip=SynthImpact(); impactSrc.clip=impactClip;
 
    // Collision sparks particle system (faíscas esticadas, sem blocos)
    var sparkGO=new GameObject("Collision Sparks");sparkGO.transform.SetParent(transform,false);
@@ -157,8 +166,14 @@ public class CarEffects : MonoBehaviour {
   }
  }
 
- AudioSource Src(float vol,bool loop,float spatial,float minDist,float maxDist){
-  var s=gameObject.AddComponent<AudioSource>();s.playOnAwake=false;s.loop=loop;s.volume=vol;s.spatialBlend=spatial;s.minDistance=minDist;s.maxDistance=maxDist;return s;
+ AudioSource Src(float vol,bool loop,float spatial,float minDist,float maxDist,AudioMixerGroup group){
+  var s=gameObject.AddComponent<AudioSource>();s.playOnAwake=false;s.loop=loop;s.volume=vol;s.spatialBlend=spatial;s.minDistance=minDist;s.maxDistance=maxDist;s.outputAudioMixerGroup=group;return s;
+ }
+
+ static AudioMixerGroup Group(AudioMixer mixer,string name){
+  if(!mixer)return null;
+  var groups=mixer.FindMatchingGroups(name);
+  return groups.Length>0?groups[0]:null;
  }
 
  void Update(){
@@ -205,7 +220,20 @@ public class CarEffects : MonoBehaviour {
   if(force>4){
    if(impactSrc!=null){impactSrc.volume=Mathf.Clamp01(force/30)*.4f;impactSrc.pitch=.7f+Random.Range(0,.4f);impactSrc.PlayOneShot(impactClip);}
    if(sparkSystem!=null&&col.contactCount>0){sparkSystem.transform.position=col.GetContact(0).point;sparkSystem.Emit(Mathf.CeilToInt(force*1.5f));}
+   if(GameSettings.VibrationEnabled&&Gamepad.current!=null){
+    if(rumbleRoutine!=null)StopCoroutine(rumbleRoutine);
+    rumbleRoutine=StartCoroutine(ImpactRumble(Mathf.Clamp01(force/24f)));
+   }
   }
+ }
+
+ IEnumerator ImpactRumble(float strength){
+  var pad=Gamepad.current;
+  if(pad==null)yield break;
+  pad.SetMotorSpeeds(strength*.45f,strength);
+  yield return new WaitForSecondsRealtime(Mathf.Lerp(.06f,.18f,strength));
+  pad.SetMotorSpeeds(0f,0f);
+  rumbleRoutine=null;
  }
 
  static AudioClip SynthEngine(){
@@ -231,6 +259,7 @@ public class CarEffects : MonoBehaviour {
  }
 
  void OnDestroy(){
+  if(isPlayer&&Gamepad.current!=null)Gamepad.current.SetMotorSpeeds(0f,0f);
   if(engineClip)Destroy(engineClip);if(screechClip)Destroy(screechClip);
   if(windClip)Destroy(windClip);if(nitroClip)Destroy(nitroClip);if(impactClip)Destroy(impactClip);
  }

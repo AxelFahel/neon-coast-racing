@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Audio;
 namespace NeonCoast {
 public class RaceAudio : MonoBehaviour {
  public RaceSession race;
@@ -9,7 +10,9 @@ public class RaceAudio : MonoBehaviour {
 
  void Awake(){
   if(!race) race=FindFirstObjectByType<RaceSession>();
-  beepSrc=gameObject.AddComponent<AudioSource>();beepSrc.playOnAwake=false;beepSrc.spatialBlend=0;beepSrc.volume=.4f;
+  var mixer=Resources.Load<AudioMixer>("NeonCoastMixer");
+  var groups=mixer?mixer.FindMatchingGroups("UI"):null;
+  beepSrc=gameObject.AddComponent<AudioSource>();beepSrc.playOnAwake=false;beepSrc.spatialBlend=0;beepSrc.volume=.4f;beepSrc.outputAudioMixerGroup=groups!=null&&groups.Length>0?groups[0]:null;
   beepClip=SynthTone(880,.12f,.45f);   // A5 — countdown tick
   goClip=SynthTone(1760,.25f,.5f);     // A6 — GO!
   finishClip=SynthFanfare();            // finish jingle

@@ -30,8 +30,11 @@ public class RacingHUD : MonoBehaviour {
 
  float alertTimer;
  int lastLapAnnounced = 1;
+ int lastScreenWidth, lastScreenHeight;
+ Rect lastSafeArea;
 
  void Start() {
+  ApplyResponsiveLayout(true);
   if (carNameText != null && car != null) {
    var v = VehicleRegistry.GetSelectedVehicle();
    carNameText.text = v.name + "  //  " + v.tagline;
@@ -39,6 +42,7 @@ public class RacingHUD : MonoBehaviour {
  }
 
  void Update() {
+  ApplyResponsiveLayout(false);
   if (!car || !race) return;
 
   float spd = car.SpeedKmh;
@@ -114,6 +118,42 @@ public class RacingHUD : MonoBehaviour {
    string rec = (GameMode.TimeTrial && race.RecordLap < float.PositiveInfinity) ? ("     MELHOR: " + System.TimeSpan.FromSeconds(race.RecordLap).ToString(@"mm\:ss\.ff")) : "";
    status.text = car.Paused ? "PAUSADO  /  ESC PARA CONTINUAR" : race.Countdown > 0 ? "LARGADA EM " + Mathf.CeilToInt(race.Countdown) : race.Finished ? "" : prefix + "VOLTA " + race.Lap + " / " + race.totalLaps + "     CHECKPOINT " + (race.Next + 1) + " / " + race.checkpoints.Length + rec;
   }
+ }
+
+ void ApplyResponsiveLayout(bool force) {
+  Rect safe = Screen.safeArea;
+  if (!force && lastScreenWidth == Screen.width && lastScreenHeight == Screen.height && lastSafeArea == safe) return;
+  lastScreenWidth = Screen.width;
+  lastScreenHeight = Screen.height;
+  lastSafeArea = safe;
+
+  var canvas = GetComponent<Canvas>() ?? GetComponentInParent<Canvas>();
+  if (!canvas || Screen.width <= 0 || Screen.height <= 0) return;
+  float scale = Mathf.Max(.01f, canvas.scaleFactor);
+  float left = safe.xMin / scale + 24f;
+  float right = (Screen.width - safe.xMax) / scale + 24f;
+  float bottom = safe.yMin / scale + 20f;
+  float top = (Screen.height - safe.yMax) / scale + 20f;
+
+  Place("Status Card", new Vector2(0f, 1f), new Vector2(left, -top));
+  Place("Timing Card", new Vector2(1f, 1f), new Vector2(-right, -top));
+  Place("Dashboard Card", new Vector2(1f, 0f), new Vector2(-right, bottom));
+  Place("Controls Panel", new Vector2(0f, 0f), new Vector2(left, bottom));
+
+  var controls = transform.Find("Controls Panel");
+  if (controls) {
+   var rt = controls as RectTransform;
+   if (rt) rt.sizeDelta = new Vector2(650f, 56f);
+   var label = controls.Find("Controls Hint")?.GetComponent<TMP_Text>();
+   if (label) { label.fontSize = Mathf.Max(label.fontSize, 16f); label.rectTransform.sizeDelta = new Vector2(620f, 42f); }
+  }
+ }
+
+ void Place(string childName, Vector2 anchor, Vector2 position) {
+  var child = transform.Find(childName) as RectTransform;
+  if (!child) return;
+  child.anchorMin = child.anchorMax = child.pivot = anchor;
+  child.anchoredPosition = position;
  }
 
  void UpdateAlerts() {

@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+### Melhorado
+- Recordes pessoais agora são isolados por pista, modo e veículo, com migração única dos recordes legados.
+- HUD ganhou margens de área segura e reposicionamento responsivo para 720p, ultrawide e telas com recortes.
+- Dicas de controle ficaram maiores e a tela de resultados alterna automaticamente entre instruções de teclado e gamepad.
+- Direção analógica ganhou deadzone e sensibilidade persistentes; colisões agora geram vibração proporcional no controle.
+- IA busca o nó mais próximo em uma janela local do traçado, reduzindo o custo por quadro sem prejudicar recuperação após teleporte.
+- Câmera de perseguição passou a reutilizar a referência do Rigidbody do jogador.
+
+### Build e validação
+- Exemplos e extras do TextMesh Pro foram retirados de `Assets` para não entrarem no player.
+- Adicionada validação automatizada de recordes, cenas, Canvas, EventSystem, HUD e ordem das cenas do build.
+- Adicionada rotina segura via Package Manager para remover dependências sem uso após o Editor liberar o projeto.
+
 - Correções visuais (20/09/2026): carro de vitrine cinemático e sem gravidade; plataforma com anel vazado e refletor apontado para o carro.
 - Cidade: pivôs de escala unitária impedem que janelas, telhados e outdoors herdem dimensões gigantes dos prédios. Migração idempotente dos objetos antigos ao abrir a cena NeonCoast; alterações pendentes não são salvas automaticamente.
 - Aerofólios: eliminadas faces invertidas sobre os mesmos vértices que anulavam as normais; carbono com reflexão mais suave.

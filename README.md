@@ -33,7 +33,7 @@ Este marco contém um circuito litorâneo contínuo com variações de elevaçã
 ## 🏆 Modos de Jogo & Fluxo
 
 * **Corrida de Circuito (Circuit Race)**: Disputa de 3 voltas contra 3 oponentes controlados por IA, incluindo tráfego civil no percurso.
-* **Tomada de Tempo (Time Trial)**: Modo solo para buscar a melhor volta com pista livre (sem rivais ou tráfego civil). Salva recordes pessoais de melhor volta e tempo total no `PlayerPrefs` (`NCR_BestLap`, `NCR_BestRace`), exibindo divisões de tempo e badges no HUD.
+* **Tomada de Tempo (Time Trial)**: Modo solo para buscar a melhor volta com pista livre (sem rivais ou tráfego civil). Salva recordes pessoais de melhor volta e tempo total separados por pista, modo e veículo, exibindo divisões de tempo e badges no HUD. Chaves antigas são migradas uma única vez.
 * **Menu Principal (`MainMenu.cs`)**: Tela inicial neon com opções de Iniciar Corrida, Tomada de Tempo, Seletor de Veículos e Sair.
 * **Menu de Pausa (`PauseMenu.cs`)**: Overlay em jogo para Continuar, Reiniciar ou Retornar ao Menu Principal.
 * **Resultados da Corrida (`RaceResults.cs`)**: Tela final exibindo posição, tempo total decorrido, melhor volta e badges de recorde.
