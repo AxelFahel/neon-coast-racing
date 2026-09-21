@@ -12,7 +12,7 @@ public static class GameInput {
   var k=Keyboard.current; var g=Gamepad.current;
   float kb=0; if(k!=null) kb=(k.wKey.isPressed||k.upArrowKey.isPressed?1:0)-(k.sKey.isPressed||k.downArrowKey.isPressed?1:0);
   float gp=0; if(g!=null) gp=g.rightTrigger.ReadValue()-g.leftTrigger.ReadValue();
-  return Mathf.Abs(gp)>.02f?gp:kb;
+  return Mathf.Abs(gp)>.04f?gp:kb;
  }}
 
  /// <summary>-1 (left) to +1 (right). Gamepad: left stick X with deadzone.</summary>
@@ -20,7 +20,10 @@ public static class GameInput {
   var k=Keyboard.current; var g=Gamepad.current;
   float kb=0; if(k!=null) kb=(k.dKey.isPressed||k.rightArrowKey.isPressed?1:0)-(k.aKey.isPressed||k.leftArrowKey.isPressed?1:0);
   float gp=0; if(g!=null) gp=g.leftStick.x.ReadValue();
-  return Mathf.Abs(gp)>.1f?gp:kb;
+  float deadzone=GameSettings.SteeringDeadzone;
+  if(Mathf.Abs(gp)<=deadzone)return kb;
+  float normalized=Mathf.Sign(gp)*Mathf.InverseLerp(deadzone,1f,Mathf.Abs(gp));
+  return Mathf.Clamp(normalized*GameSettings.SteeringSensitivity,-1f,1f);
  }}
 
  // --- Driving (held buttons) ---

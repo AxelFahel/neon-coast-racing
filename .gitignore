@@ -8,6 +8,10 @@
 /[Uu]ser[Ss]ettings/
 /[Mm]emoryCaptures/
 /[Rr]ecordings/
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+/Assets/Temp/
+/Assets/Temp.meta
 
 # Asset origin cache directory
 /[Aa]ssets/[Aa]ssetStoreTools*

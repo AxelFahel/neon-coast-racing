@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 namespace NeonCoast {
 public class RaceSession : MonoBehaviour {
  public ArcadeCar player;
@@ -16,9 +17,11 @@ public class RaceSession : MonoBehaviour {
  public float RecordRace { get; private set; } = float.PositiveInfinity;
  public bool NewLapRecord { get; private set; }
  public bool NewRaceRecord { get; private set; }
+ public bool FinishPresentationComplete { get; set; }
 
  float lapStart, raceClock;
  GridRacer playerRacer;
+ string recordTrackId, recordVehicleId;
 
  void Awake() {
   racers = FindObjectsByType<GridRacer>(FindObjectsSortMode.None);
@@ -34,8 +37,11 @@ public class RaceSession : MonoBehaviour {
    }
   }
 
-  RecordLap = PlayerPrefs.GetFloat("NCR_BestLap", float.PositiveInfinity);
-  RecordRace = PlayerPrefs.GetFloat("NCR_BestRace", float.PositiveInfinity);
+  recordTrackId = SceneManager.GetActiveScene().name;
+  var selectedVehicle = VehicleRegistry.GetSelectedVehicle();
+  recordVehicleId = selectedVehicle != null ? selectedVehicle.id : "unknown";
+  RecordLap = RaceRecordStore.Load("lap", recordTrackId, GameMode.TimeTrial, recordVehicleId);
+  RecordRace = RaceRecordStore.Load("race", recordTrackId, GameMode.TimeTrial, recordVehicleId);
 
   if (GameMode.TimeTrial) {
    foreach (var d in FindObjectsByType<PaceDriver>(FindObjectsSortMode.None)) d.gameObject.SetActive(false);
@@ -48,12 +54,59 @@ public class RaceSession : MonoBehaviour {
   if (!FindFirstObjectByType<TrackSpectators>()) {
    new GameObject("Track Spectators").AddComponent<TrackSpectators>();
   }
+
+  // Sistemas de apresentação são adicionados em tempo de execução para não
+  // reserializar a cena autoral nem exigir referências manuais no Inspector.
+  if (!GetComponent<RacePresentation>()) gameObject.AddComponent<RacePresentation>();
+  if (!GetComponent<RaceAmbience>()) gameObject.AddComponent<RaceAmbience>();
+  if (!GetComponent<DynamicWeather>()) gameObject.AddComponent<DynamicWeather>();
+  if (!GetComponent<FinishReplay>()) gameObject.AddComponent<FinishReplay>();
  }
 
  struct GridSlot {
   public Vector3 pos;
   public Quaternion rot;
   public GridSlot(Vector3 p, Quaternion r) { pos = p; rot = r; }
+ }
+
+ float GetLargestCarFrontExtent(Vector3 raceForward) {
+  float largest = 0f;
+  if (racers == null) return 2.6f;
+
+  foreach (var racer in racers) {
+   if (!racer) continue;
+   bool foundPhysicalBounds = false;
+   var colliders = racer.GetComponentsInChildren<Collider>(true);
+   foreach (var collider in colliders) {
+    if (!collider || !collider.enabled || collider.isTrigger) continue;
+    foundPhysicalBounds = true;
+    Bounds bounds = collider.bounds;
+    Vector3 ext = bounds.extents;
+    float projectedExtent = Mathf.Abs(raceForward.x) * ext.x
+                          + Mathf.Abs(raceForward.y) * ext.y
+                          + Mathf.Abs(raceForward.z) * ext.z;
+    float centerOffset = Vector3.Dot(bounds.center - racer.transform.position, raceForward);
+    largest = Mathf.Max(largest, centerOffset + projectedExtent);
+   }
+
+   // Modelos sem collider usam somente malhas estáticas; partículas e rastros
+   // ficam de fora porque seus bounds podem ter centenas de metros.
+   if (!foundPhysicalBounds) {
+    foreach (var renderer in racer.GetComponentsInChildren<MeshRenderer>(true)) {
+     if (!renderer || !renderer.enabled) continue;
+     Bounds bounds = renderer.bounds;
+     Vector3 ext = bounds.extents;
+     float projectedExtent = Mathf.Abs(raceForward.x) * ext.x
+                           + Mathf.Abs(raceForward.y) * ext.y
+                           + Mathf.Abs(raceForward.z) * ext.z;
+     float centerOffset = Vector3.Dot(bounds.center - racer.transform.position, raceForward);
+     largest = Mathf.Max(largest, centerOffset + projectedExtent);
+    }
+   }
+  }
+
+  // Mantém uma margem segura mesmo se um modelo ainda não tiver renderer ativo.
+  return Mathf.Max(2.6f, largest);
  }
 
  void RandomizeStartingGrid() {
@@ -64,10 +117,31 @@ public class RaceSession : MonoBehaviour {
    if (r) slots.Add(new GridSlot(r.transform.position, r.transform.rotation));
   }
 
-  // Ordena os slots do 1º ao último baseado na proximidade da linha de largada
-  if (checkpoints != null && checkpoints.Length > 0 && checkpoints[0] != null) {
-   Vector3 cp0 = checkpoints[0].position;
-   slots.Sort((a, b) => (a.pos - cp0).sqrMagnitude.CompareTo((b.pos - cp0).sqrMagnitude));
+  // O último checkpoint é a linha de chegada/largada. O grid original tinha o
+  // centro do primeiro carro sobre a faixa; além de parecer adiantado, o bico
+  // podia ficar depois dela. Preserva o desenho do grid, mas recua todos os
+  // slots até o carro mais à frente ficar inteiramente antes da linha.
+  if (checkpoints != null && checkpoints.Length > 0 && checkpoints[checkpoints.Length - 1] != null) {
+   Transform startLine = checkpoints[checkpoints.Length - 1];
+   Vector3 raceForward = Vector3.ProjectOnPlane(startLine.forward, Vector3.up).normalized;
+   if (raceForward.sqrMagnitude < 0.5f) raceForward = startLine.forward.normalized;
+
+   slots.Sort((a, b) => {
+    float aProgress = Vector3.Dot(a.pos - startLine.position, raceForward);
+    float bProgress = Vector3.Dot(b.pos - startLine.position, raceForward);
+    return bProgress.CompareTo(aProgress);
+   });
+
+   // Usa o maior comprimento visual entre todos os carros. Assim qualquer
+   // veículo sorteado para a primeira vaga fica inteiro atrás da faixa.
+   float frontGridClearance = GetLargestCarFrontExtent(raceForward) + 1.25f;
+   float frontProgress = float.NegativeInfinity;
+   for (int i = 0; i < slots.Count; i++)
+    frontProgress = Mathf.Max(frontProgress, Vector3.Dot(slots[i].pos - startLine.position, raceForward));
+
+   Vector3 gridCorrection = raceForward * (-frontGridClearance - frontProgress);
+   for (int i = 0; i < slots.Count; i++)
+    slots[i] = new GridSlot(slots[i].pos + gridCorrection, slots[i].rot);
   }
 
   // Embaralha competidores (Fisher-Yates)
@@ -217,12 +291,12 @@ public class RaceSession : MonoBehaviour {
    if (BestLap < RecordLap) {
     RecordLap = BestLap;
     NewLapRecord = true;
-    PlayerPrefs.SetFloat("NCR_BestLap", BestLap);
+     RaceRecordStore.Save("lap", recordTrackId, GameMode.TimeTrial, recordVehicleId, BestLap);
    }
    if (Elapsed < RecordRace) {
     RecordRace = Elapsed;
     NewRaceRecord = true;
-    PlayerPrefs.SetFloat("NCR_BestRace", Elapsed);
+     RaceRecordStore.Save("race", recordTrackId, GameMode.TimeTrial, recordVehicleId, Elapsed);
    }
    PlayerPrefs.Save();
   }

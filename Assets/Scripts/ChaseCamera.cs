@@ -5,6 +5,7 @@ namespace NeonCoast {
 public class ChaseCamera : MonoBehaviour {
  public ArcadeCar target;
  Camera cam;
+ Rigidbody targetBody;
  Vector3 velocity;
  float yaw;
  float currentRoll;
@@ -14,7 +15,7 @@ public class ChaseCamera : MonoBehaviour {
 
  void Awake() {
   cam = GetComponent<Camera>();
-  if (target) yaw = target.transform.eulerAngles.y;
+  if (target) { yaw = target.transform.eulerAngles.y; targetBody = target.GetComponent<Rigidbody>(); }
  }
 
  void LateUpdate() {
@@ -64,7 +65,9 @@ public class ChaseCamera : MonoBehaviour {
   Quaternion lookRot = Quaternion.LookRotation((lookTarget - transform.position).normalized);
 
   // Inclinação lateral sutil em derrapagens
-  float targetRoll = target.Drifting ? -Mathf.Sign(Vector3.Dot(target.GetComponent<Rigidbody>().angularVelocity, Vector3.up)) * 2.2f : 0f;
+  if (!targetBody) targetBody = target.GetComponent<Rigidbody>();
+  float yawVelocity = targetBody ? Vector3.Dot(targetBody.angularVelocity, Vector3.up) : 0f;
+  float targetRoll = target.Drifting ? -Mathf.Sign(yawVelocity) * 2.2f : 0f;
   currentRoll = Mathf.Lerp(currentRoll, targetRoll, Time.deltaTime * 4f);
   transform.rotation = Quaternion.Slerp(transform.rotation, lookRot * Quaternion.Euler(0, 0, currentRoll), 1f - Mathf.Exp(-12f * Time.deltaTime));
 

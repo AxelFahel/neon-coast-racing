@@ -37,7 +37,11 @@ public class RacingHUD : MonoBehaviour {
   ApplyResponsiveLayout(true);
   if (carNameText != null && car != null) {
    var v = VehicleRegistry.GetSelectedVehicle();
-   carNameText.text = v.name + "  //  " + v.tagline;
+   // A área é uma faixa curta. A antiga combinação nome + slogan quebrava em
+   // duas linhas e ficava ilegível em 16:9 e resoluções menores.
+   carNameText.text = v != null ? v.name.ToUpperInvariant() : "NEON COAST RACING";
+   carNameText.textWrappingMode = TextWrappingModes.NoWrap;
+   carNameText.overflowMode = TextOverflowModes.Ellipsis;
   }
  }
 

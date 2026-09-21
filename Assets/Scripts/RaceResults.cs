@@ -15,6 +15,7 @@ public class RaceResults : MonoBehaviour {
 
  void Update() {
   if (!race || !race.Finished) return;
+  if (!race.FinishPresentationComplete) return;
   if (!shown) { Show(); shown = true; }
   if (GameInput.Confirm) {
    Time.timeScale = 1;
@@ -54,7 +55,9 @@ public class RaceResults : MonoBehaviour {
   }
 
   if (promptText) {
-   promptText.text = "ENTER / (A)  Reiniciar     ESC / (B)  Menu Principal";
+   promptText.text = GameInput.GamepadConnected
+    ? "(A)  Reiniciar     (B)  Menu Principal"
+    : "ENTER  Reiniciar     ESC  Menu Principal";
   }
  }
 }

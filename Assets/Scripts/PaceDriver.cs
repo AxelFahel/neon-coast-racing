@@ -23,6 +23,7 @@ public class PaceDriver : MonoBehaviour {
     float lastMoveCheckTimer;
     Vector3 lastCheckPos;
     int closest;
+    bool closestInitialized;
 
     // Constantes de tunelamento e navegação
     const float StuckThreshold    = 3.0f;
@@ -76,14 +77,7 @@ public class PaceDriver : MonoBehaviour {
         if (path == null || path.Length < 4) return;
 
         // ── 1. Localiza o nó do traçado mais próximo ────────────────────────
-        float bestDistSq = float.MaxValue;
-        for (int i = 0; i < path.Length; i++) {
-            float d = (path[i] - transform.position).sqrMagnitude;
-            if (d < bestDistSq) {
-                bestDistSq = d;
-                closest = i;
-            }
-        }
+        FindClosestPathNode();
 
         // ── 2. Análise de Curvatura Preditiva (Corner Anticipation) ──────────
         // Examina o traçado à frente para calcular a velocidade segura da curva
@@ -324,6 +318,31 @@ public class PaceDriver : MonoBehaviour {
             lastCheckPos = respawnPos;
             Recoveries++;
         }
+    }
+
+    // The route is ordered, so the closest point normally moves only a few nodes
+    // per frame. Searching a local window avoids a full path scan for every AI car.
+    void FindClosestPathNode() {
+        int count = path.Length;
+        int radius = closestInitialized ? Mathf.Min(12, count - 1) : count - 1;
+        float bestDistSq = float.MaxValue;
+        int best = closest;
+        for (int offset = -radius; offset <= radius; offset++) {
+            int index = ((closest + offset) % count + count) % count;
+            float distance = (path[index] - transform.position).sqrMagnitude;
+            if (distance < bestDistSq) { bestDistSq = distance; best = index; }
+        }
+
+        // A reset or teleport can place the car outside the local search window.
+        if (closestInitialized && bestDistSq > 900f) {
+            bestDistSq = float.MaxValue;
+            for (int i = 0; i < count; i++) {
+                float distance = (path[i] - transform.position).sqrMagnitude;
+                if (distance < bestDistSq) { bestDistSq = distance; best = i; }
+            }
+        }
+        closest = best;
+        closestInitialized = true;
     }
 
     /// <summary>

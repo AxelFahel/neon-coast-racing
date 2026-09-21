@@ -57,6 +57,7 @@ public class TrackSpectators : MonoBehaviour {
         public Transform rightLeg;
         public Transform phoneLight;
         public Vector3 basePos;
+        public Vector3 torsoBaseLocalPos;
         public Vector3 forwardDir;
         public float animOffset;
         public float walkSpeed;
@@ -72,9 +73,10 @@ public class TrackSpectators : MonoBehaviour {
     Transform playerTransform;
 
     // Pool de materiais compartilhados
-    Material matSkin, matSkinDark, matPants, matPantsDark;
+    Material matSkinLight, matSkinWarm, matSkinBrown, matSkinDark, matPants, matPantsDark;
     Material matCyan, matPink, matYellow, matWhite, matDark, matGreen, matOrange;
     Material matPhone, matShoe, matHair, matHairBlonde, matHairRed;
+    Material matEyeWhite, matEyeDark, matLip;
 
     void Awake() {
         SpawnAllSpectators();
@@ -96,7 +98,7 @@ public class TrackSpectators : MonoBehaviour {
 
         Material[] jacketMats = new Material[] { matCyan, matPink, matYellow, matWhite, matDark, matGreen, matOrange };
         Material[] pantsMats  = new Material[] { matPants, matPantsDark, matDark };
-        Material[] skinMats   = new Material[] { matSkin, matSkinDark };
+        Material[] skinMats   = new Material[] { matSkinLight, matSkinWarm, matSkinBrown, matSkinDark };
         Material[] hairMats   = new Material[] { matHair, matHairBlonde, matHairRed, matDark };
 
         // ── 1. RETA PRINCIPAL E LARGADA (t = 0.97 até 0.06) ───────────────────
@@ -185,26 +187,34 @@ public class TrackSpectators : MonoBehaviour {
         var unlitShader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color") ?? litShader;
 
         // Tons de pele variados (não apenas um padrão)
-        matSkin     = CreateMat(litShader, "SpecSkin_Light",   new Color(0.90f, 0.72f, 0.56f), 0.0f, 0.28f);
-        matSkinDark = CreateMat(litShader, "SpecSkin_Dark",    new Color(0.42f, 0.28f, 0.18f), 0.0f, 0.25f);
+        matSkinLight = CreateMat(litShader, "SpecSkin_Light", new Color(0.93f, 0.76f, 0.62f), 0.0f, 0.34f);
+        matSkinWarm  = CreateMat(litShader, "SpecSkin_Warm",  new Color(0.76f, 0.50f, 0.34f), 0.0f, 0.31f);
+        matSkinBrown = CreateMat(litShader, "SpecSkin_Brown", new Color(0.52f, 0.32f, 0.21f), 0.0f, 0.29f);
+        matSkinDark  = CreateMat(litShader, "SpecSkin_Dark",  new Color(0.27f, 0.17f, 0.12f), 0.0f, 0.27f);
 
         // Calças e shorts variados
         matPants     = CreateMat(litShader, "SpecPants_Dark",  new Color(0.10f, 0.12f, 0.16f), 0.0f, 0.18f);
         matPantsDark = CreateMat(litShader, "SpecPants_Navy",  new Color(0.06f, 0.10f, 0.22f), 0.0f, 0.20f);
 
         // Roupas neon variadas
-        matCyan   = CreateMat(litShader, "SpecCyan",   new Color(0.05f, 0.85f, 1.0f),  0.0f, 0.65f, new Color(0.02f, 0.5f, 0.6f));
-        matPink   = CreateMat(litShader, "SpecPink",   new Color(1.0f, 0.12f, 0.45f),  0.0f, 0.65f, new Color(0.5f, 0.02f, 0.2f));
-        matYellow = CreateMat(litShader, "SpecYellow", new Color(1.0f, 0.82f, 0.10f),  0.0f, 0.55f, new Color(0.5f, 0.35f, 0.01f));
+        matCyan   = CreateMat(litShader, "SpecCyan",   new Color(0.05f, 0.62f, 0.72f), 0.0f, 0.48f, new Color(0.01f, 0.08f, 0.10f));
+        matPink   = CreateMat(litShader, "SpecPink",   new Color(0.72f, 0.10f, 0.30f), 0.0f, 0.46f, new Color(0.09f, 0.01f, 0.03f));
+        matYellow = CreateMat(litShader, "SpecYellow", new Color(0.78f, 0.62f, 0.12f), 0.0f, 0.42f, new Color(0.08f, 0.05f, 0.01f));
         matWhite  = CreateMat(litShader, "SpecWhite",  new Color(0.92f, 0.94f, 0.96f), 0.0f, 0.45f);
         matDark   = CreateMat(litShader, "SpecDark",   new Color(0.16f, 0.18f, 0.22f), 0.0f, 0.35f);
-        matGreen  = CreateMat(litShader, "SpecGreen",  new Color(0.05f, 0.88f, 0.42f), 0.0f, 0.60f, new Color(0.01f, 0.4f, 0.15f));
-        matOrange = CreateMat(litShader, "SpecOrange", new Color(1.0f, 0.48f, 0.05f),  0.0f, 0.55f, new Color(0.5f, 0.18f, 0.01f));
+        matGreen  = CreateMat(litShader, "SpecGreen",  new Color(0.05f, 0.62f, 0.30f), 0.0f, 0.44f, new Color(0.01f, 0.07f, 0.025f));
+        matOrange = CreateMat(litShader, "SpecOrange", new Color(0.82f, 0.36f, 0.04f), 0.0f, 0.43f, new Color(0.08f, 0.025f, 0.01f));
 
         // Cabelos variados
         matHair       = CreateMat(litShader, "SpecHair_Black",  new Color(0.08f, 0.07f, 0.07f), 0.0f, 0.30f);
         matHairBlonde = CreateMat(litShader, "SpecHair_Blonde", new Color(0.88f, 0.72f, 0.32f), 0.0f, 0.32f);
         matHairRed    = CreateMat(litShader, "SpecHair_Red",    new Color(0.62f, 0.14f, 0.10f), 0.0f, 0.28f);
+
+        // Materiais faciais sem emissão: o rosto continua legível sob o neon,
+        // mas não parece uma máscara ou um manequim luminoso.
+        matEyeWhite = CreateMat(litShader, "SpecEye_White", new Color(0.90f, 0.92f, 0.90f), 0f, 0.38f);
+        matEyeDark  = CreateMat(litShader, "SpecEye_Dark",  new Color(0.025f, 0.035f, 0.045f), 0f, 0.25f);
+        matLip      = CreateMat(litShader, "SpecLip",       new Color(0.42f, 0.10f, 0.10f), 0f, 0.24f);
 
         // Acessórios
         matPhone = CreateMat(unlitShader, "SpecPhoneScreen", Color.white, 0f, 0f, new Color(1.8f, 2.2f, 2.5f));
@@ -223,52 +233,73 @@ public class TrackSpectators : MonoBehaviour {
         root.transform.position = pos;
         root.transform.rotation = rot;
 
-        // Variação de altura: 90% a 108% da altura padrão
+        // Variações independentes de altura e biotipo evitam uma multidão de clones.
         float heightFactor = 0.90f + Mathf.Repeat(offset * 7.3f, 0.18f);
-        root.transform.localScale = Vector3.one * heightFactor;
+        float bodyBuild = 0.90f + Mathf.Repeat(offset * 11.7f, 0.20f);
+        root.transform.localScale = new Vector3(bodyBuild, heightFactor, bodyBuild);
 
         // ──────────────────────────────────────────────────────────────────────
         // ANATOMIA HUMANA PROPORCIONAL
         // Referência: altura total ~1.75m (unidades Unity)
         // ──────────────────────────────────────────────────────────────────────
 
-        // PERNAS — cilíndricas, com articulação de joelho implícita
+        // PERNAS — proporções adultas, com joelho na metade da perna
         // Coxa esquerda
-        var leftThigh  = CreateLimb("Thigh_L",  root.transform, new Vector3(-0.105f, 0.72f, 0f), new Vector3(0.115f, 0.36f, 0.115f), pants);
-        var rightThigh = CreateLimb("Thigh_R",  root.transform, new Vector3( 0.105f, 0.72f, 0f), new Vector3(0.115f, 0.36f, 0.115f), pants);
+        var leftThigh  = CreateLimb("Thigh_L",  root.transform, new Vector3(-0.105f, 0.86f, 0f), new Vector3(0.13f, 0.43f, 0.14f), pants);
+        var rightThigh = CreateLimb("Thigh_R",  root.transform, new Vector3( 0.105f, 0.86f, 0f), new Vector3(0.13f, 0.43f, 0.14f), pants);
         // Canela
-        var leftShin   = CreateLimb("Shin_L",   leftThigh.transform,  new Vector3(0f, -0.36f, 0.01f), new Vector3(0.095f, 0.33f, 0.095f), pants);
-        var rightShin  = CreateLimb("Shin_R",   rightThigh.transform, new Vector3(0f, -0.36f, 0.01f), new Vector3(0.095f, 0.33f, 0.095f), pants);
+        var leftShin   = CreateLimb("Shin_L",   leftThigh.transform,  new Vector3(0f, -0.43f, 0.01f), new Vector3(0.105f, 0.39f, 0.11f), pants);
+        var rightShin  = CreateLimb("Shin_R",   rightThigh.transform, new Vector3(0f, -0.43f, 0.01f), new Vector3(0.105f, 0.39f, 0.11f), pants);
         // Sapato
         CreateBox("Shoe_L", leftShin.transform,  new Vector3(0f, -0.20f, 0.05f), new Vector3(0.12f, 0.09f, 0.22f), shoe);
         CreateBox("Shoe_R", rightShin.transform, new Vector3(0f, -0.20f, 0.05f), new Vector3(0.12f, 0.09f, 0.22f), shoe);
 
         // QUADRIL — une pernas ao torso
-        var hips = CreateBox("Hips", root.transform, new Vector3(0f, 1.07f, 0f), new Vector3(0.30f, 0.14f, 0.19f), pants);
+        CreateBox("Hips", root.transform, new Vector3(0f, 0.94f, 0f), new Vector3(0.34f, 0.17f, 0.22f), pants);
 
-        // TORSO — slim, com curvatura humana (capsule)
-        var torso = CreateLimb("Torso", root.transform, new Vector3(0f, 1.34f, 0f), new Vector3(0.30f, 0.36f, 0.25f), jacket);
+        // TORSO — ombros mais largos e cintura visível
+        var torso = CreateLimb("Torso", root.transform, new Vector3(0f, 1.48f, 0f), new Vector3(0.40f, 0.52f, 0.26f), jacket);
+        CreateBox("Waist", root.transform, new Vector3(0f, 1.02f, 0f), new Vector3(0.29f, 0.16f, 0.20f), jacket);
 
         // PESCOÇO
-        var neck = CreateLimb("Neck", torso.transform, new Vector3(0f, 0.22f, 0f), new Vector3(0.10f, 0.10f, 0.10f), skin);
+        var neck = CreateLimb("Neck", torso.transform, new Vector3(0f, 0.08f, 0f), new Vector3(0.10f, 0.13f, 0.10f), skin);
 
-        // CABEÇA — esférica, tamanho proporcional
-        var head = CreateSphere("Head", neck.transform, new Vector3(0f, 0.14f, 0f), 0.20f, skin);
+        // CABEÇA — levemente oval, com face legível na direção +Z
+        var head = CreateEllipsoid("Head", neck.transform, new Vector3(0f, 0.17f, 0f), new Vector3(0.31f, 0.38f, 0.30f), skin);
 
-        // CABELO — forma volumosa sobre a cabeça
-        var hairTop = CreateSphere("Hair_Top", head.transform, new Vector3(0f, 0.06f, -0.01f), 0.195f, hair);
-        // Viseira / boné cyberpunk em 50% dos personagens
-        bool hasCap = ((int)(offset * 100f) % 2 == 0);
+        // Olhos, pupilas, nariz, boca e orelhas quebram a silhueta de manequim.
+        for (int eye = -1; eye <= 1; eye += 2) {
+            CreateEllipsoid("Eye_" + eye, head.transform, new Vector3(eye * 0.058f, 0.025f, 0.148f), new Vector3(0.054f, 0.030f, 0.018f), matEyeWhite);
+            CreateSphere("Pupil_" + eye, head.transform, new Vector3(eye * 0.058f, 0.025f, 0.160f), 0.012f, matEyeDark);
+            var brow = CreateBox("Brow_" + eye, head.transform, new Vector3(eye * 0.058f, 0.064f, 0.153f), new Vector3(0.065f, 0.012f, 0.010f), hair);
+            brow.transform.localRotation = Quaternion.Euler(0f, 0f, eye * -5f);
+        }
+        CreateEllipsoid("Nose", head.transform, new Vector3(0f, -0.015f, 0.158f), new Vector3(0.040f, 0.070f, 0.045f), skin);
+        CreateBox("Mouth", head.transform, new Vector3(0f, -0.082f, 0.151f), new Vector3(0.075f, 0.014f, 0.012f), matLip);
+        CreateSphere("Ear_L", head.transform, new Vector3(-0.158f, 0f, 0f), 0.042f, skin);
+        CreateSphere("Ear_R", head.transform, new Vector3( 0.158f, 0f, 0f), 0.042f, skin);
+
+        // CABELO — somente sobre o crânio; antes uma esfera inteira escondia o rosto.
+        int hairStyle = Mathf.Abs((int)(offset * 97f)) % 3;
+        CreateEllipsoid("Hair_Top", head.transform, new Vector3(0f, 0.125f, -0.025f), new Vector3(0.325f, 0.17f, 0.30f), hair);
+        if (hairStyle == 1) {
+            CreateBox("Hair_Back", head.transform, new Vector3(0f, -0.035f, -0.135f), new Vector3(0.26f, 0.28f, 0.08f), hair);
+        } else if (hairStyle == 2) {
+            CreateSphere("Hair_Curl_L", head.transform, new Vector3(-0.115f, 0.08f, -0.02f), 0.075f, hair);
+            CreateSphere("Hair_Curl_R", head.transform, new Vector3( 0.115f, 0.08f, -0.02f), 0.075f, hair);
+        }
+        // Boné em parte da multidão, sem esconder a face.
+        bool hasCap = ((int)(offset * 100f) % 4 == 0);
         if (hasCap) {
-            CreateBox("Cap_Bill", head.transform, new Vector3(0f, 0.04f, 0.14f), new Vector3(0.22f, 0.04f, 0.14f), jacket);
-            CreateSphere("Cap_Crown", head.transform, new Vector3(0f, 0.09f, -0.01f), 0.185f, jacket);
+            CreateBox("Cap_Bill", head.transform, new Vector3(0f, 0.09f, 0.16f), new Vector3(0.22f, 0.035f, 0.13f), jacket);
+            CreateEllipsoid("Cap_Crown", head.transform, new Vector3(0f, 0.135f, -0.01f), new Vector3(0.34f, 0.15f, 0.31f), jacket);
         }
 
         // BRAÇOS — cilíndricos com antebraço
-        var leftUpperArm  = CreateLimb("UpperArm_L",  torso.transform, new Vector3(-0.22f, 0.10f, 0f),  new Vector3(0.10f, 0.28f, 0.10f), jacket);
-        var rightUpperArm = CreateLimb("UpperArm_R",  torso.transform, new Vector3( 0.22f, 0.10f, 0f),  new Vector3(0.10f, 0.28f, 0.10f), jacket);
-        var leftForearm   = CreateLimb("Forearm_L",   leftUpperArm.transform,  new Vector3(0f, -0.30f, 0.01f), new Vector3(0.085f, 0.25f, 0.085f), skin);
-        var rightForearm  = CreateLimb("Forearm_R",   rightUpperArm.transform, new Vector3(0f, -0.30f, 0.01f), new Vector3(0.085f, 0.25f, 0.085f), skin);
+        var leftUpperArm  = CreateLimb("UpperArm_L",  torso.transform, new Vector3(-0.27f, -0.05f, 0f), new Vector3(0.11f, 0.31f, 0.11f), jacket);
+        var rightUpperArm = CreateLimb("UpperArm_R",  torso.transform, new Vector3( 0.27f, -0.05f, 0f), new Vector3(0.11f, 0.31f, 0.11f), jacket);
+        var leftForearm   = CreateLimb("Forearm_L",   leftUpperArm.transform,  new Vector3(0f, -0.31f, 0.01f), new Vector3(0.09f, 0.27f, 0.09f), skin);
+        var rightForearm  = CreateLimb("Forearm_R",   rightUpperArm.transform, new Vector3(0f, -0.31f, 0.01f), new Vector3(0.09f, 0.27f, 0.09f), skin);
         // Mãos
         CreateBox("Hand_L", leftForearm.transform,  new Vector3(0f, -0.16f, 0f), new Vector3(0.08f, 0.09f, 0.07f), skin);
         CreateBox("Hand_R", rightForearm.transform, new Vector3(0f, -0.16f, 0f), new Vector3(0.08f, 0.09f, 0.07f), skin);
@@ -290,6 +321,11 @@ public class TrackSpectators : MonoBehaviour {
             rightForearm.transform.localRotation  = Quaternion.Euler(-20f, 0f, 0f);
         }
 
+        // Três níveis de detalhe: o rig facial completo só é desenhado perto
+        // da câmera; à distância entram proxies humanos leves. Os ossos acima
+        // continuam dirigindo as animações do LOD principal.
+        SetupHumanLOD(root, jacket, pants, skin, hair);
+
         var instance = new SpectatorInstance {
             root = root,
             type = type,
@@ -301,6 +337,7 @@ public class TrackSpectators : MonoBehaviour {
             rightLeg = rightThigh.transform,
             phoneLight = phoneLightT,
             basePos = pos,
+            torsoBaseLocalPos = torso.transform.localPosition,
             forwardDir = rot * Vector3.forward,
             animOffset = offset,
             walkSpeed = 1.2f,
@@ -311,6 +348,55 @@ public class TrackSpectators : MonoBehaviour {
 
         spectators.Add(instance);
         return instance;
+    }
+
+    void SetupHumanLOD(GameObject root, Material jacket, Material pants, Material skin, Material hair) {
+        var high = root.GetComponentsInChildren<Renderer>(true);
+
+        var midRoot = new GameObject("LOD1 Human");
+        midRoot.transform.SetParent(root.transform, false);
+        var mid = new List<Renderer> {
+            Proxy(PrimitiveType.Capsule, "LOD1 Torso", midRoot.transform, new Vector3(0, 1.25f, 0), new Vector3(.38f, .38f, .25f), jacket),
+            Proxy(PrimitiveType.Sphere, "LOD1 Head", midRoot.transform, new Vector3(0, 1.72f, 0), new Vector3(.31f, .37f, .30f), skin),
+            Proxy(PrimitiveType.Sphere, "LOD1 Hair", midRoot.transform, new Vector3(0, 1.82f, -.02f), new Vector3(.32f, .15f, .29f), hair),
+            Proxy(PrimitiveType.Capsule, "LOD1 Leg L", midRoot.transform, new Vector3(-.11f, .48f, 0), new Vector3(.13f, .42f, .13f), pants),
+            Proxy(PrimitiveType.Capsule, "LOD1 Leg R", midRoot.transform, new Vector3( .11f, .48f, 0), new Vector3(.13f, .42f, .13f), pants),
+            Proxy(PrimitiveType.Capsule, "LOD1 Arm L", midRoot.transform, new Vector3(-.28f, 1.16f, 0), new Vector3(.10f, .30f, .10f), jacket),
+            Proxy(PrimitiveType.Capsule, "LOD1 Arm R", midRoot.transform, new Vector3( .28f, 1.16f, 0), new Vector3(.10f, .30f, .10f), jacket)
+        };
+
+        var lowRoot = new GameObject("LOD2 Silhouette");
+        lowRoot.transform.SetParent(root.transform, false);
+        var low = new[] {
+            Proxy(PrimitiveType.Capsule, "LOD2 Body", lowRoot.transform, new Vector3(0, .92f, 0), new Vector3(.38f, .78f, .25f), jacket),
+            Proxy(PrimitiveType.Sphere, "LOD2 Head", lowRoot.transform, new Vector3(0, 1.72f, 0), new Vector3(.30f, .35f, .29f), skin)
+        };
+
+        var lodGroup = root.AddComponent<LODGroup>();
+        lodGroup.fadeMode = LODFadeMode.CrossFade;
+        lodGroup.animateCrossFading = true;
+        lodGroup.SetLODs(new[] {
+            // Na câmera de largada uma pessoa ocupa ~8-10% da altura da tela.
+            // O limite antigo (.18) já trocava para o proxy sem rosto, fazendo
+            // a torcida parecer composta por manequins. Mantém anatomia e face
+            // completas nas distâncias em que o jogador consegue percebê-las.
+            new LOD(.065f, high),
+            new LOD(.022f, mid.ToArray()),
+            new LOD(.007f, low)
+        });
+        lodGroup.RecalculateBounds();
+    }
+
+    Renderer Proxy(PrimitiveType type, string name, Transform parent, Vector3 position, Vector3 scale, Material material) {
+        var go = GameObject.CreatePrimitive(type);
+        go.name = name;
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = position;
+        go.transform.localScale = scale;
+        DestroyImmediate(go.GetComponent<Collider>());
+        var renderer = go.GetComponent<Renderer>();
+        renderer.sharedMaterial = material;
+        return renderer;
     }
 
     // Cria um segmento cilíndrico de membro (Capsule com pivô no topo)
@@ -340,6 +426,20 @@ public class TrackSpectators : MonoBehaviour {
         go.name = "Geometry";
         go.transform.SetParent(pivot.transform, false);
         go.transform.localScale = Vector3.one * radius * 2f;
+        DestroyImmediate(go.GetComponent<Collider>());
+        go.GetComponent<Renderer>().sharedMaterial = mat;
+        return pivot;
+    }
+
+    GameObject CreateEllipsoid(string n, Transform parent, Vector3 localPos, Vector3 scale, Material mat) {
+        var pivot = new GameObject(n);
+        pivot.transform.SetParent(parent, false);
+        pivot.transform.localPosition = localPos;
+
+        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        go.name = "Geometry";
+        go.transform.SetParent(pivot.transform, false);
+        go.transform.localScale = scale;
         DestroyImmediate(go.GetComponent<Collider>());
         go.GetComponent<Renderer>().sharedMaterial = mat;
         return pivot;
@@ -412,7 +512,7 @@ public class TrackSpectators : MonoBehaviour {
                     if (s.torso) {
                         float torsoSwing = Mathf.Sin(walkCycle * 2f) * 2.5f;
                         s.torso.localRotation = Quaternion.Euler(3f, torsoSwing, 0f);
-                        s.torso.localPosition = new Vector3(0, 1.34f + Mathf.Abs(Mathf.Sin(walkCycle * 2f)) * 0.025f, 0);
+                        s.torso.localPosition = s.torsoBaseLocalPos + Vector3.up * (Mathf.Abs(Mathf.Sin(walkCycle * 2f)) * 0.025f);
                     }
                     break;
 
@@ -425,7 +525,7 @@ public class TrackSpectators : MonoBehaviour {
                     if (s.leftArm)  s.leftArm.localRotation  = Quaternion.Euler(-118f + armSwing, -10f, -18f);
                     if (s.rightArm) s.rightArm.localRotation = Quaternion.Euler(-108f - armSwing,  10f,  18f);
                     if (s.torso) {
-                        s.torso.localPosition = new Vector3(0, 1.34f + bodyBounce, 0);
+                        s.torso.localPosition = s.torsoBaseLocalPos + Vector3.up * bodyBounce;
                         // Leve rotação do tronco durante a torcida
                         float torsoRot = Mathf.Sin(time * cheerSpeed * 0.5f + s.animOffset) * 6f;
                         s.torso.localRotation = Quaternion.Euler(0f, torsoRot, 0f);

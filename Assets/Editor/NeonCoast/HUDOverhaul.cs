@@ -214,7 +214,7 @@ public static class HUDOverhaul {
   var cprt = ctrlPanel.GetComponent<RectTransform>();
   cprt.anchorMin = cprt.anchorMax = cprt.pivot = new Vector2(0, 0);
   cprt.anchoredPosition = new Vector2(24, 20);
-  cprt.sizeDelta = new Vector2(560, 48);
+  cprt.sizeDelta = new Vector2(650, 56);
   ctrlPanel.GetComponent<Image>().color = glassBg;
 
   var ctrlAccent = new GameObject("Left Accent", typeof(RectTransform), typeof(Image));
@@ -226,7 +226,7 @@ public static class HUDOverhaul {
 
   hud.controlsGroup = ctrlPanel.GetComponent<CanvasGroup>();
 
-  var ctrlTxt = Label(ctrlPanel.transform, "Controls Hint", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(535, 36), 14, textWhite, TextAlignmentOptions.Left);
+  var ctrlTxt = Label(ctrlPanel.transform, "Controls Hint", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620, 42), 16, textWhite, TextAlignmentOptions.Left);
   ctrlTxt.text = "<color=#19E6FF><b>W/RT</b></color> Acelerar   <color=#19E6FF><b>S/LT</b></color> Freio   <color=#19E6FF><b>A-D</b></color> Direção   <color=#FF1A59><b>ESPAÇO</b></color> Drift   <color=#19E6FF><b>SHIFT</b></color> Nitro   <color=#8DA4BF><b>ESC</b></color> Pause";
 
   // =========================================================================
